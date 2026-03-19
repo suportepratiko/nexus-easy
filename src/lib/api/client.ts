@@ -1,16 +1,13 @@
 /**
- * Cliente HTTP base para o backend da API Safirion.
- * Base URL configurada via VITE_API_URL.
+ * Cliente HTTP para o backend da API Safirion.
+ *
+ * Importante: no deploy (EasyPanel) o backend normalmente não fica acessível publicamente (ex.: porta 8001).
+ * Por isso, fazemos requisições relativas (ex.: `/api/...`) para que o Vite proxy encaminhe.
  */
 
-// Em dev sem VITE_API_URL: usa '' para o proxy do Vite encaminhar /api e /health ao backend (porta 8001).
-// Sempre abra o app em http://localhost:8000 para o proxy funcionar.
-const BASE_URL =
-  import.meta.env.VITE_API_URL !== undefined && import.meta.env.VITE_API_URL !== ""
-    ? import.meta.env.VITE_API_URL
-    : import.meta.env.DEV
-      ? ""
-      : "http://localhost:8001";
+// Mantemos a variável para compatibilidade, mas o código abaixo ignora BASE_URL
+// quando o endpoint passado já é relativo (como sempre ocorre aqui: `/api/...`).
+const BASE_URL = "";
 
 export type ApiError = { detail: string; status: number };
 
@@ -44,7 +41,13 @@ export async function apiRequest<T>(
   path: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const url = path.startsWith("http") ? path : `${BASE_URL.replace(/\/$/, "")}${path.startsWith("/") ? path : `/${path}`}`;
+  // Se o caller passar URL absoluta, usamos diretamente.
+  // Caso contrário, fazemos chamada relativa (ex.: /api/...) para o proxy do Vite.
+  const url = path.startsWith("http")
+    ? path
+    : path.startsWith("/")
+      ? path
+      : `/${path}`;
   const res = await fetch(url, {
     ...options,
     headers: {

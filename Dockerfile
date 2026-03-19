@@ -22,13 +22,12 @@ COPY backend ./backend
 COPY scripts ./scripts
 RUN npm run setup:backend
 
-# 3) Copia o restante do código e faz build do frontend
+# 3) Copia o restante do código
 COPY . .
-RUN npm run build
 
 EXPOSE 8000
 
-# Roda backend + frontend (Vite preview) juntos no mesmo container.
+# Roda backend + frontend (Vite dev) juntos no mesmo container.
 # Observação: o backend escuta em 8001 e o frontend em 8000.
-CMD ["sh", "-c", "node scripts/start-backend.cjs & npx vite preview --host 0.0.0.0 --port 8000 --strictPort"]
+CMD ["sh", "-c", "node scripts/start-backend.cjs & npx vite --host 0.0.0.0 --port 8000 --strictPort"]
 
