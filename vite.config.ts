@@ -3,7 +3,10 @@ import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
 
-const easypanelHost = process.env.EASYPANEL_HOST ?? "sgc-nexus-easy.u6y5np.easypanel.host";
+const easypanelHosts = (process.env.EASYPANEL_HOST ?? "")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
 
 const serverConfig = {
   host: "::",
@@ -12,7 +15,7 @@ const serverConfig = {
     "nexusbot.pratiko.app.br",
     "localhost",
     "127.0.0.1",
-    easypanelHost,
+    ...easypanelHosts,
   ].filter(Boolean),
   hmr: {
     overlay: false,
