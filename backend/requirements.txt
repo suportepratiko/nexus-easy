@@ -15,6 +15,7 @@ sqlalchemy>=2.0.0
 # Auth plataforma (JWT + bcrypt)
 pyjwt>=2.9.0
 passlib[bcrypt]>=1.7.4
+bcrypt==3.2.2
 
 # Segurança
 slowapi>=0.1.9

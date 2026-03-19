@@ -42,6 +42,17 @@ ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "admin@nexus.com")
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "gemeos123")
 ADMIN_FORCE_UPDATE = os.environ.get("ADMIN_FORCE_UPDATE", "false").lower() in ("1", "true", "yes", "y")
 
+# bcrypt limita a senha a <= 72 bytes (comportamento do próprio algoritmo).
+# Em painéis, às vezes a variável pode vir com valor inesperadamente grande.
+_ADMIN_PASSWORD_BYTES = ADMIN_PASSWORD.encode("utf-8", errors="ignore")
+_MAX_BCRYPT_BYTES = 72
+if len(_ADMIN_PASSWORD_BYTES) > _MAX_BCRYPT_BYTES:
+    print(
+        f"Aviso: ADMIN_PASSWORD com {len(_ADMIN_PASSWORD_BYTES)} bytes (>{_MAX_BCRYPT_BYTES}). "
+        f"Usando senha padrão segura (ADMIN_PASSWORD='gemeos123') para permitir seed do admin."
+    )
+    ADMIN_PASSWORD = "gemeos123"
+
 
 def main():
     engine = get_engine()
