@@ -4,6 +4,7 @@ Conexão e modelos para PostgreSQL (auth da plataforma).
 from __future__ import annotations
 
 import os
+import logging
 from sqlalchemy import (
     create_engine,
     text,
@@ -255,6 +256,13 @@ class UserOperation(Base):
 
 def get_engine():
     url = os.environ.get("DATABASE_URL") or "postgresql://app:app_secret@localhost:5432/app_db"
+
+    # Alguns painéis/env vars configuram `postgres://` (sem o "ql"), mas o SQLAlchemy
+    # espera `postgresql://`. Normalizamos para evitar crash no boot.
+    if url.startswith("postgres://"):
+        logging.warning("[database] DATABASE_URL com esquema `postgres://`. Convertendo para `postgresql://`.")
+        url = url.replace("postgres://", "postgresql://", 1)
+
     return create_engine(url, pool_pre_ping=True)
 
 
@@ -271,6 +279,17 @@ def init_db() -> None:
     Seguro para ser chamado múltiplas vezes (create_all é idempotente).
     """
     engine = get_engine()
+
+    # Necessário para a função `gen_random_uuid()` usada nos defaults dos UUIDs.
+    # Em um banco "zerado", a extensão pode não estar habilitada.
+    try:
+        with engine.begin() as conn:
+            conn.execute(text("CREATE EXTENSION IF NOT EXISTS pgcrypto"))
+    except Exception as e:
+        # Se a permissão não permitir criar extensão, manter log e seguir.
+        # As tabelas podem falhar depois por causa de `gen_random_uuid()`.
+        logging.warning("[database] Falha ao criar extensão pgcrypto: %s", e)
+
     Base.metadata.create_all(bind=engine)
     # Compatibilidade com esquemas já existentes: garante colunas novas sem precisar dropar tabela.
     with engine.begin() as conn:
