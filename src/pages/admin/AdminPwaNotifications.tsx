@@ -85,6 +85,7 @@ export default function AdminPwaNotificationsPage() {
   const [sending, setSending] = useState(false);
   const [editing, setEditing] = useState<Record<string, { title: string; body: string }>>({});
   const [savingKey, setSavingKey] = useState<string | null>(null);
+  const [savingAll, setSavingAll] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteAllOpen, setDeleteAllOpen] = useState(false);
   const [deletingAll, setDeletingAll] = useState(false);
@@ -98,7 +99,8 @@ export default function AdminPwaNotificationsPage() {
         getPwaHistory(50),
       ]);
       setStats(s);
-      setTemplates(t);
+      const ORDER = ["operation_opened", "operation_finished", "stop_gain", "stop_loss"];
+      setTemplates([...t].sort((a, b) => ORDER.indexOf(a.trigger_key) - ORDER.indexOf(b.trigger_key)));
       setHistory(h);
       setEditing(
         t.reduce((acc, x) => {
@@ -189,6 +191,25 @@ export default function AdminPwaNotificationsPage() {
       toast.error("Falha ao salvar template.");
     } finally {
       setSavingKey(null);
+    }
+  };
+
+  const handleSaveAll = async () => {
+    setSavingAll(true);
+    try {
+      await Promise.all(
+        templates.map((t) => {
+          const e = editing[t.trigger_key];
+          if (!e) return Promise.resolve();
+          return updatePwaTemplate(t.trigger_key, { title_template: e.title, body_template: e.body });
+        })
+      );
+      toast.success("Todos os templates salvos!");
+      load();
+    } catch {
+      toast.error("Falha ao salvar um ou mais templates.");
+    } finally {
+      setSavingAll(false);
     }
   };
 
@@ -350,15 +371,56 @@ export default function AdminPwaNotificationsPage() {
             </TabsContent>
 
             <TabsContent value="templates" className="mt-0 focus-visible:outline-none p-6">
-              <div className="rounded-lg bg-muted/40 border border-border px-4 py-3 mb-6">
-                <p className="text-sm text-muted-foreground">
-                  <span className="font-medium text-foreground">Variáveis:</span>{" "}
-                  <code className="rounded bg-muted px-1.5 py-0.5 text-xs font-mono">{"{{asset}}"}</code>,{" "}
-                  <code className="rounded bg-muted px-1.5 py-0.5 text-xs font-mono">{"{{direction}}"}</code>,{" "}
-                  <code className="rounded bg-muted px-1.5 py-0.5 text-xs font-mono">{"{{result}}"}</code>,{" "}
-                  <code className="rounded bg-muted px-1.5 py-0.5 text-xs font-mono">{"{{profit}}"}</code>,{" "}
-                  <code className="rounded bg-muted px-1.5 py-0.5 text-xs font-mono">{"{{type}}"}</code>
-                </p>
+              <div className="rounded-xl bg-muted/30 border border-border p-5 mb-6 space-y-4">
+                <p className="text-sm font-semibold text-foreground">Variáveis disponíveis por evento</p>
+                <div className="grid gap-4 lg:grid-cols-3">
+                  {[
+                    {
+                      label: "Abertura de operação",
+                      color: "text-blue-400",
+                      vars: [
+                        { key: "{{asset}}",       desc: "Ativo negociado (ex: EURUSD-OTC)" },
+                        { key: "{{direction}}",   desc: "Compra ou Venda" },
+                        { key: "{{entry_value}}", desc: "Valor da entrada (ex: 200.00)" },
+                      ],
+                    },
+                    {
+                      label: "Operação finalizada",
+                      color: "text-emerald-400",
+                      vars: [
+                        { key: "{{asset}}",         desc: "Ativo negociado" },
+                        { key: "{{direction}}",     desc: "Compra ou Venda" },
+                        { key: "{{result}}",        desc: "Win ou Loss" },
+                        { key: "{{profit_label}}", desc: "Lucro ou Prejuízo" },
+                        { key: "{{profit}}",        desc: "Valor absoluto (ex: 176.00)" },
+                        { key: "{{profit_signed}}", desc: "Com sinal (ex: +176.00 / -50.00)" },
+                        { key: "{{entry_value}}",   desc: "Valor da entrada" },
+                      ],
+                    },
+                    {
+                      label: "Stop Gain / Stop Loss",
+                      color: "text-amber-400",
+                      vars: [
+                        { key: "{{profit}}",  desc: "Lucro/prejuízo total da sessão" },
+                        { key: "{{entries}}", desc: "Total de entradas realizadas" },
+                        { key: "{{wins}}",    desc: "Número de operações ganhas" },
+                        { key: "{{losses}}",  desc: "Número de operações perdidas" },
+                      ],
+                    },
+                  ].map(({ label, color, vars }) => (
+                    <div key={label} className="rounded-lg bg-muted/50 border border-border p-4 space-y-3">
+                      <p className={`text-xs font-semibold uppercase tracking-wide ${color}`}>{label}</p>
+                      <div className="space-y-2">
+                        {vars.map(({ key, desc }) => (
+                          <div key={key} className="flex items-start gap-2">
+                            <code className="shrink-0 rounded bg-background border border-border px-1.5 py-0.5 text-xs font-mono text-foreground">{key}</code>
+                            <span className="text-xs text-muted-foreground leading-5">{desc}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
               <div className="grid gap-4 grid-cols-2 xl:grid-cols-4">
                 {templates.map((t) => {
@@ -415,23 +477,24 @@ export default function AdminPwaNotificationsPage() {
                             className="min-h-[80px] resize-y"
                           />
                         </div>
-                        <Button
-                          size="sm"
-                          onClick={() => handleSaveTemplate(t.trigger_key)}
-                          disabled={savingKey === t.trigger_key}
-                          className="w-full"
-                        >
-                          {savingKey === t.trigger_key ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            "Salvar template"
-                          )}
-                        </Button>
                       </div>
                     </CardContent>
                   </Card>
                   );
                 })}
+              </div>
+              <div className="flex justify-end mt-4">
+                <Button
+                  onClick={handleSaveAll}
+                  disabled={savingAll}
+                  className="gap-2 px-8"
+                >
+                  {savingAll ? (
+                    <><Loader2 className="h-4 w-4 animate-spin" /> Salvando…</>
+                  ) : (
+                    "Salvar todos os templates"
+                  )}
+                </Button>
               </div>
             </TabsContent>
           </Tabs>

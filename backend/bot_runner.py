@@ -1780,7 +1780,12 @@ def _run_bot(token: str, s, config: dict) -> None:
                     "strategy": current_strategy,
                     "duration": current_duration,
                 })
-                _trigger_push_event(session_email, "operation_opened", {"asset": used_active, "direction": direction})
+                direction_label = "Compra" if direction == "call" else "Venda"
+                _trigger_push_event(session_email, "operation_opened", {
+                    "asset": used_active,
+                    "direction": direction_label,
+                    "entry_value": f"{price:.2f}",
+                })
                 state["current_balance"] = current_balance
                 state["total_profit"] = total_profit
 
@@ -1979,7 +1984,19 @@ def _run_bot(token: str, s, config: dict) -> None:
                     operations[-1]["balanceAfter"] = round(current_balance, 2)
                     res = operations[-1].get("result", "")
                     prof = operations[-1].get("profit", 0)
-                    _trigger_push_event(session_email, "operation_finished", {"result": res, "profit": f"{prof:.2f}"})
+                    op_direction = operations[-1].get("direction", direction)
+                    direction_label = "Compra" if op_direction == "call" else "Venda"
+                    result_label = "Win" if res == "win" else ("Loss" if res == "loss" else "Empate")
+                    profit_label = "Lucro" if res == "win" else ("Prejuízo" if res == "loss" else "Resultado")
+                    _trigger_push_event(session_email, "operation_finished", {
+                        "asset": used_active,
+                        "direction": direction_label,
+                        "result": result_label,
+                        "profit_label": profit_label,
+                        "profit": f"{abs(prof):.2f}",
+                        "profit_signed": f"{prof:+.2f}",
+                        "entry_value": f"{price:.2f}",
+                    })
                     # Persiste operação para ranking de usuários (se houver email de sessão).
                     try:
                         _save_user_operation(session_email, operations[-1], total_profit)
@@ -2025,7 +2042,12 @@ def _run_bot(token: str, s, config: dict) -> None:
             ):
                 state["running"] = False
                 state["stop_reason"] = "stop_gain"
-                _trigger_push_event(session_email, "stop_gain", {})
+                _trigger_push_event(session_email, "stop_gain", {
+                    "profit": f"{total_profit:.2f}",
+                    "entries": str(entries_count),
+                    "wins": str(win_cycles_count),
+                    "losses": str(loss_cycles_count),
+                })
                 logging.info(
                     "bot_runner: stop_gain atingido | mode=%s value=%.2f total_profit=%.2f entries=%d",
                     stop_gain_mode,
@@ -2043,7 +2065,12 @@ def _run_bot(token: str, s, config: dict) -> None:
             ):
                 state["running"] = False
                 state["stop_reason"] = "stop_gain"
-                _trigger_push_event(session_email, "stop_gain", {})
+                _trigger_push_event(session_email, "stop_gain", {
+                    "profit": f"{total_profit:.2f}",
+                    "entries": str(entries_count),
+                    "wins": str(win_cycles_count),
+                    "losses": str(loss_cycles_count),
+                })
                 logging.info(
                     "bot_runner: stop_gain (entries) atingido | wins=%d losses=%d entradas=%d target=%.2f total_profit=%.2f",
                     win_cycles_count,
@@ -2063,7 +2090,12 @@ def _run_bot(token: str, s, config: dict) -> None:
             ):
                 state["running"] = False
                 state["stop_reason"] = "stop_loss"
-                _trigger_push_event(session_email, "stop_loss", {})
+                _trigger_push_event(session_email, "stop_loss", {
+                    "profit": f"{total_profit:.2f}",
+                    "entries": str(entries_count),
+                    "wins": str(win_cycles_count),
+                    "losses": str(loss_cycles_count),
+                })
                 logging.info(
                     "bot_runner: stop_loss atingido | mode=%s value=%.2f total_profit=%.2f entries=%d",
                     stop_loss_mode,
@@ -2081,7 +2113,12 @@ def _run_bot(token: str, s, config: dict) -> None:
             ):
                 state["running"] = False
                 state["stop_reason"] = "stop_loss"
-                _trigger_push_event(session_email, "stop_loss", {})
+                _trigger_push_event(session_email, "stop_loss", {
+                    "profit": f"{total_profit:.2f}",
+                    "entries": str(entries_count),
+                    "wins": str(win_cycles_count),
+                    "losses": str(loss_cycles_count),
+                })
                 logging.info(
                     "bot_runner: stop_loss (entries) atingido | losses=%d wins=%d entradas=%d target=%.2f total_profit=%.2f",
                     loss_cycles_count,

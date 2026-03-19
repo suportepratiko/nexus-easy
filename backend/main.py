@@ -2788,10 +2788,10 @@ class PwaHistoryItem(BaseModel):
 def _ensure_pwa_templates(db: Session) -> None:
     """Garante que existem os templates padrão (Stop Gain e Stop Loss separados)."""
     for key, title, body in [
-        ("operation_opened", "Operação aberta", "Nova operação: {{asset}} {{direction}}."),
-        ("operation_finished", "Operação finalizada", "Resultado: {{result}}. Lucro: R$ {{profit}}."),
-        ("stop_gain", "Stop Gain", "Meta de lucro atingida. O robô parou."),
-        ("stop_loss", "Stop Loss", "Limite de perda atingido. O robô parou."),
+        ("operation_opened",  "Operação aberta",    "{{direction}} em {{asset}} — R$ {{entry_value}}"),
+        ("operation_finished","Operação finalizada", "{{result}} | {{direction}} {{asset}} — {{profit_label}}: R$ {{profit}}"),
+        ("stop_gain",         "✅ Stop Gain",         "Meta atingida! Lucro da sessão: R$ {{profit}} em {{entries}} entradas ({{wins}}✓ / {{losses}}✗)"),
+        ("stop_loss",         "🛑 Stop Loss",         "Limite atingido. Resultado da sessão: R$ {{profit}} em {{entries}} entradas ({{wins}}✓ / {{losses}}✗)"),
     ]:
         t = db.query(PwaMessageTemplate).filter(PwaMessageTemplate.trigger_key == key).first()
         if not t:
