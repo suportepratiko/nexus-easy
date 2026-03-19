@@ -14,8 +14,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY package*.json ./
 RUN npm ci
 
-# A partir daqui, pode tratar como produção (sem impactar o que já foi instalado).
-ENV NODE_ENV=production
+# Rode Vite em modo desenvolvimento para garantir `server.proxy` funcionando.
+# Evita efeitos colaterais de `NODE_ENV=production` em builds/configs.
+ENV NODE_ENV=development
+
+# Em alguns hosts (ex.: painéis/containers) o watcher nativo falha; polling melhora a estabilidade.
+ENV CHOKIDAR_USEPOLLING=true
 
 # 2) Cria o venv do backend e instala dependências python
 COPY backend ./backend
@@ -29,5 +33,5 @@ EXPOSE 8000
 
 # Roda backend + frontend (Vite dev) juntos no mesmo container.
 # Observação: o backend escuta em 8001 e o frontend em 8000.
-CMD ["sh", "-c", "node scripts/start-backend.cjs & npx vite --host 0.0.0.0 --port 8000 --strictPort"]
+CMD ["sh", "-c", "node scripts/start-backend.cjs & npx vite --host 0.0.0.0 --port 8000 --strictPort --mode development"]
 
