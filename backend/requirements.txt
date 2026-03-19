@@ -1,0 +1,28 @@
+# Backend API (proxy Safirion + PostgreSQL)
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+python-multipart>=0.0.12
+
+# Safirion API deps (usada via path no projeto)
+requests>=2.31.0
+websocket-client>=1.8.0
+
+# DB (auth plataforma)
+python-dotenv>=1.0.0
+psycopg2-binary>=2.9.9
+sqlalchemy>=2.0.0
+
+# Auth plataforma (JWT + bcrypt)
+pyjwt>=2.9.0
+passlib[bcrypt]>=1.7.4
+
+# Segurança
+slowapi>=0.1.9
+cryptography>=42.0.0
+
+# Gemini AI (estratégias customizadas)
+google-generativeai>=0.8.0
+
+# Web Push (PWA notificações)
+pywebpush>=1.14.0
+py_vapid>=1.9.0
