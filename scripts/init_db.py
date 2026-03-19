@@ -38,8 +38,8 @@ from passlib.hash import bcrypt
 
 from backend.database import Base, User, get_engine
 
-ADMIN_EMAIL = "admin@nexus.com"
-ADMIN_PASSWORD = "gemeos123"
+ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "admin@nexus.com")
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "gemeos123")
 
 
 def main():
@@ -50,6 +50,11 @@ def main():
     print("Conexão OK.")
 
     print("Criando tabela users...")
+
+    # Necessário para `gen_random_uuid()` (usado como default de UUIDs).
+    with engine.begin() as conn:
+        conn.execute(text("CREATE EXTENSION IF NOT EXISTS pgcrypto"))
+
     Base.metadata.create_all(bind=engine)
 
     # Migração: adicionar colunas is_active e expires_at se não existirem
