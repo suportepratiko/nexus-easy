@@ -40,6 +40,7 @@ from backend.database import Base, User, get_engine
 
 ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "admin@nexus.com")
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "gemeos123")
+ADMIN_FORCE_UPDATE = os.environ.get("ADMIN_FORCE_UPDATE", "false").lower() in ("1", "true", "yes", "y")
 
 
 def main():
@@ -82,10 +83,13 @@ def main():
     password_hash = bcrypt.hash(ADMIN_PASSWORD)
     existing = session.query(User).filter(User.email == ADMIN_EMAIL).first()
     if existing:
-        existing.password_hash = password_hash
-        existing.role = UserRole.ADMIN
-        session.commit()
-        print(f"Conta admin atualizada: {ADMIN_EMAIL} (role=admin, hash compatível com login)")
+        if ADMIN_FORCE_UPDATE:
+            existing.password_hash = password_hash
+            existing.role = UserRole.ADMIN
+            session.commit()
+            print(f"Conta admin atualizada: {ADMIN_EMAIL} (role=admin, hash compatível com login)")
+        else:
+            print(f"Conta admin já existe: {ADMIN_EMAIL}. Mantendo credenciais existentes.")
     else:
         admin = User(email=ADMIN_EMAIL, password_hash=password_hash, role=UserRole.ADMIN)
         session.add(admin)

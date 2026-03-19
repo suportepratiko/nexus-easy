@@ -3,7 +3,7 @@
  * Inicia o backend FastAPI usando o venv do projeto.
  * Carrega .env da raiz e repassa ao processo Python.
  */
-const { spawn } = require("child_process");
+const { spawn, execSync } = require("child_process");
 const path = require("path");
 const fs = require("fs");
 
@@ -23,6 +23,14 @@ if (!fs.existsSync(venvPython)) {
   process.exit(1);
 }
 
+function sleepSync(ms) {
+  // Atomics.wait permite "sleep síncrono" em Node.js sem async/await.
+  // Ideal para retries de start em ambiente (ex.: EasyPanel).
+  const sab = new SharedArrayBuffer(4);
+  const int32 = new Int32Array(sab);
+  Atomics.wait(int32, 0, 0, ms);
+}
+
 // Carregar .env e repassar ao backend (garante DATABASE_URL etc.)
 const envPath = path.join(root, ".env");
 const env = { ...process.env, PYTHONPATH: root };
@@ -38,6 +46,25 @@ if (fs.existsSync(envPath)) {
         v = v.slice(1, -1);
       env[k] = v;
     }
+  }
+}
+
+// Garante que tabelas e admin existem no banco recém-criado.
+// Script é idempotente e não apaga dados.
+const seedAttempts = 10;
+for (let i = 1; i <= seedAttempts; i++) {
+  try {
+    console.log(`[backend] seed init_db.py (tentativa ${i}/${seedAttempts}) ...`);
+    execSync(`"${venvPython}" scripts/init_db.py`, { cwd: root, env, stdio: "inherit" });
+    console.log("[backend] seed init_db.py concluído.");
+    break;
+  } catch (e) {
+    if (i === seedAttempts) {
+      console.error("[backend] Falha definitiva ao executar seed init_db.py:", e?.message ?? e);
+      process.exit(1);
+    }
+    console.warn("[backend] Seed falhou; aguardando para nova tentativa...");
+    sleepSync(2000 * i);
   }
 }
 
