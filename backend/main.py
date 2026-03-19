@@ -101,16 +101,16 @@ JWT_EXPIRATION_HOURS = 24
 
 # Criptografia para senhas da corretora (Fernet / AES-128-CBC)
 _BROKER_ENC_KEY = os.environ.get("BROKER_ENC_KEY", "")
-if _BROKER_ENC_KEY:
-    try:
-        _fernet = Fernet(_BROKER_ENC_KEY.encode())
-    except Exception:
-        logging.warning("⚠️  BROKER_ENC_KEY inválida. Será gerada uma chave temporária (não persiste entre restarts).")
-        _BROKER_ENC_KEY = ""
-        _fernet = None
-else:
-    _fernet = None
-    logging.warning("⚠️  BROKER_ENC_KEY não definida. Senhas da corretora armazenadas sem criptografia. Defina no .env.")
+if not _BROKER_ENC_KEY:
+    raise RuntimeError(
+        "❌  BROKER_ENC_KEY não definida no .env. "
+        "Gere uma chave com: python -c \"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\" "
+        "e adicione ao .env antes de iniciar o servidor."
+    )
+try:
+    _fernet = Fernet(_BROKER_ENC_KEY.encode())
+except Exception as e:
+    raise RuntimeError(f"❌  BROKER_ENC_KEY inválida: {e}. Gere uma nova chave Fernet válida.")
 
 def _encrypt_password(plain: str) -> str:
     """Criptografa a senha antes de salvar no banco."""
@@ -414,7 +414,8 @@ class ForgotPasswordBody(BaseModel):
 
 
 @app.post("/api/platform/auth/forgot-password")
-def forgot_password(body: ForgotPasswordBody, db: Session = Depends(get_db)):
+@limiter.limit("3/minute")
+def forgot_password(body: ForgotPasswordBody, request: Request, db: Session = Depends(get_db)):
     """Envia email com senha temporária para recuperação de acesso."""
     import secrets, string
     email = body.email.strip().lower()
@@ -1580,12 +1581,11 @@ def admin_create_webhook(
     db: Session = Depends(get_db),
     _admin: User = Depends(get_current_admin),
 ):
-    # Secret opaco baseado em UUID4
-    secret = str(uuid.uuid4())
-    exists = db.query(Webhook).filter(Webhook.secret == secret).first()
-    while exists is not None:
-        secret = str(uuid.uuid4())
-        exists = db.query(Webhook).filter(Webhook.secret == secret).first()
+    # Secret criptograficamente seguro (48 bytes de entropia → 64 chars URL-safe)
+    import secrets as _secrets
+    secret = _secrets.token_urlsafe(48)
+    while db.query(Webhook).filter(Webhook.secret == secret).first():
+        secret = _secrets.token_urlsafe(48)
 
     webhook = Webhook(
         name=body.name.strip(),
@@ -2727,25 +2727,25 @@ def get_public_ranking(
     )
     for i, item in enumerate(all_items):
         item.position = i + 1
-    # Só enviar is_fake=True para admin; para USER nunca expor quem é fake
-    if (getattr(current_user, "role", None) or "").strip().lower() != "admin":
-        all_items = [
-            PublicRankingItem(
-                position=x.position,
-                name=x.name,
-                avatar_url=x.avatar_url,
-                total_profit=x.total_profit,
-                operations_count=x.operations_count,
-                is_fake=False,
-            )
-            for x in all_items
-        ]
+    is_admin = (getattr(current_user, "role", None) or "").strip().lower() == "admin"
 
-    return PublicRankingResponse(
-        items=all_items,
-        period_start=period_start,
-        period_end=period_end,
-    )
+    def _serialize(item: PublicRankingItem) -> dict:
+        d = {
+            "position": item.position,
+            "name": item.name,
+            "avatar_url": item.avatar_url,
+            "total_profit": item.total_profit,
+            "operations_count": item.operations_count,
+        }
+        if is_admin:
+            d["is_fake"] = item.is_fake
+        return d
+
+    return {
+        "items": [_serialize(x) for x in all_items],
+        "period_start": period_start,
+        "period_end": period_end,
+    }
 
 
 # ---------- Admin: PWA Notificações (templates, envio, estatísticas) ----------
