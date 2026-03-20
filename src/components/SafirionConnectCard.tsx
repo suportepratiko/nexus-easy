@@ -65,6 +65,21 @@ export function SafirionConnectCard() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(true);
+  // true enquanto tentamos o auto-reconnect na primeira carga (novo dispositivo)
+  const [autoConnecting, setAutoConnecting] = useState(!isAuthenticated);
+
+  // Ao montar sem token (novo dispositivo/sessão), tenta reconectar automaticamente
+  // usando as credenciais salvas no servidor. Só exibe o formulário se falhar.
+  useEffect(() => {
+    if (isAuthenticated) { setAutoConnecting(false); return; }
+    let cancelled = false;
+    reconnect()
+      .catch(() => { /* sem credenciais salvas → exibe formulário */ })
+      .finally(() => { if (!cancelled) setAutoConnecting(false); });
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Se o token expirou (401), tenta reconectar automaticamente com credenciais salvas no backend.
   // Só desloga se a reconexão também falhar.
   useEffect(() => {
@@ -98,6 +113,18 @@ export function SafirionConnectCard() {
     // 2. Desloga da corretora
     await logout();
   };
+
+  // Estado: tentando reconectar automaticamente (novo dispositivo)
+  if (autoConnecting) {
+    return (
+      <Card className="rounded-xl border border-border bg-card animate-fade-in">
+        <CardContent className="flex flex-col items-center justify-center gap-3 py-10">
+          <Loader2 className="h-7 w-7 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground">Conectando à corretora…</p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   // Estado: já conectado — tema escuro, destaque verde
   if (isAuthenticated) {
