@@ -164,22 +164,20 @@ export function AppSidebar() {
                   const Icon = EXTRA_LINK_ICONS[item.key] ?? ExternalLink;
                   return (
                     <SidebarMenuItem key={item.key}>
-                      <SidebarMenuButton asChild>
-                        <a
-                          href={item.url || "#"}
-                          target={item.url ? "_blank" : undefined}
-                          rel="noopener noreferrer"
-                          className={`text-base rounded-lg py-5 hover:bg-primary/10 hover:text-primary hover:border-primary/20 border border-transparent transition-all duration-200 flex items-center ${collapsed ? "px-0 justify-center" : "px-4"}`}
-                        >
-                          <Icon className={`h-4 w-4 shrink-0 ${collapsed ? "" : "mr-3"}`} />
-                          {!collapsed && (
-                            <span className="flex-1 flex items-center justify-between gap-1">
-                              {item.label}
-                              <ExternalLink className="h-3 w-3 opacity-40" />
-                            </span>
-                          )}
-                        </a>
-                      </SidebarMenuButton>
+                      <a
+                        href={item.url || "#"}
+                        target={item.url ? "_blank" : undefined}
+                        rel="noopener noreferrer"
+                        className={`text-base rounded-lg py-5 hover:bg-primary/10 hover:text-primary hover:border-primary/20 border border-transparent transition-all duration-200 flex items-center ${collapsed ? "px-0 justify-center" : "px-4"}`}
+                      >
+                        <Icon className={`h-4 w-4 shrink-0 ${collapsed ? "" : "mr-3"}`} />
+                        {!collapsed && (
+                          <span className="flex-1 flex items-center justify-between gap-1">
+                            {item.label}
+                            <ExternalLink className="h-3 w-3 opacity-40" />
+                          </span>
+                        )}
+                      </a>
                     </SidebarMenuItem>
                   );
                 })}
