@@ -174,11 +174,6 @@ export default function PlansLanding() {
                               <p className="text-4xl font-extrabold text-white">{perMonth}</p>
                               <span className="text-slate-400 text-sm mb-1">/mês</span>
                             </div>
-                            {isAnnual && (
-                              <p className="text-slate-500 text-xs mt-1">
-                                {formatPrice(period.price)} cobrado anualmente
-                              </p>
-                            )}
                           </div>
                           <ul className="space-y-3 text-sm text-slate-300 flex-1">
                             {[
