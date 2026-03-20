@@ -176,7 +176,24 @@ class BrokerSessionsManager:
         self._sessions: dict[str, BrokerSessionHandle] = {}
         self._lock = threading.Lock()
 
+    def get_session_by_email(self, email: str) -> str | None:
+        """Retorna o token de uma sessão ativa para o email, se existir."""
+        norm = email.strip().lower()
+        with self._lock:
+            for token, handle in self._sessions.items():
+                if handle.email == norm and handle.process.is_alive():
+                    return token
+        return None
+
     def create_session(self, email: str, password: str) -> tuple[str, str]:
+        # Se já existe sessão ativa para este email, reutiliza (sincroniza múltiplos dispositivos).
+        existing = self.get_session_by_email(email)
+        if existing:
+            with self._lock:
+                resolved = self._sessions[existing].email
+            logging.info("broker_sessions: sessão reutilizada para email=%s token=%s***", resolved, existing[:6])
+            return existing, resolved
+
         token = str(uuid.uuid4())
         parent_conn, child_conn = Pipe()
         process = Process(target=_worker, args=(token, email, password, child_conn), daemon=True)
