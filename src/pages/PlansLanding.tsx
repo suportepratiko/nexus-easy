@@ -85,11 +85,18 @@ export default function PlansLanding() {
             entradas automáticas com gestão de risco — sem você precisar fazer nada.
           </p>
           <div className="flex flex-wrap justify-center gap-6 pt-2 text-sm text-slate-400">
-            {["Funciona 24h", "Stop Gain/Loss automático", "Martingale inteligente", "Sem necessidade de experiência"].map(f => (
+            {["Funciona 24h", "Stop Gain/Loss automático", "Sem necessidade de experiência"].map(f => (
               <span key={f} className="flex items-center gap-1.5">
                 <CheckCircle2 className="h-4 w-4 text-primary shrink-0" /> {f}
               </span>
             ))}
+          </div>
+          <div className="pt-4">
+            <a href="#planos">
+              <Button size="lg" className="bg-primary text-black hover:bg-primary/90 font-bold px-10 text-base">
+                QUERO O NEXUS BOT
+              </Button>
+            </a>
           </div>
         </div>
       </section>
