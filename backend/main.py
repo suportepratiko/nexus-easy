@@ -3281,7 +3281,7 @@ def get_extra_links(db: Session = Depends(get_db), _user: User = Depends(get_cur
     """Retorna links extras ativos para exibir na sidebar do usuário."""
     _ensure_extra_links(db)
     rows = db.query(ExtraLink).filter(ExtraLink.is_active == True).order_by(ExtraLink.sort_order).all()
-    return [{"key": r.key, "label": r.label, "url": r.url} for r in rows]
+    return [{"key": r.key, "label": r.label, "url": r.url, "icon": r.icon} for r in rows]
 
 
 @app.get("/api/platform/admin/extra-links")
@@ -3289,15 +3289,38 @@ def admin_get_extra_links(db: Session = Depends(get_db), _admin: User = Depends(
     _ensure_extra_links(db)
     rows = db.query(ExtraLink).order_by(ExtraLink.sort_order).all()
     return [
-        {"key": r.key, "label": r.label, "url": r.url, "is_active": r.is_active, "sort_order": r.sort_order}
+        {"key": r.key, "label": r.label, "url": r.url, "icon": r.icon, "is_active": r.is_active, "sort_order": r.sort_order}
         for r in rows
     ]
+
+
+class ExtraLinkCreate(BaseModel):
+    label: str
+    url: str = ""
+    icon: str = "Link"
 
 
 class ExtraLinkUpdate(BaseModel):
     label: str | None = None
     url: str | None = None
+    icon: str | None = None
     is_active: bool | None = None
+
+
+@app.post("/api/platform/admin/extra-links", status_code=201)
+def admin_create_extra_link(
+    body: ExtraLinkCreate,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(get_current_admin),
+):
+    import re, secrets as _sec
+    key = re.sub(r"[^a-z0-9_]", "_", body.label.strip().lower())[:48] + "_" + _sec.token_hex(4)
+    max_order = db.query(ExtraLink).count()
+    link = ExtraLink(key=key, label=body.label.strip(), url=body.url.strip(), icon=body.icon, sort_order=max_order)
+    db.add(link)
+    db.commit()
+    db.refresh(link)
+    return {"key": link.key, "label": link.label, "url": link.url, "icon": link.icon, "is_active": link.is_active, "sort_order": link.sort_order}
 
 
 @app.patch("/api/platform/admin/extra-links/{key}")
@@ -3307,7 +3330,6 @@ def admin_update_extra_link(
     db: Session = Depends(get_db),
     _admin: User = Depends(get_current_admin),
 ):
-    _ensure_extra_links(db)
     link = db.query(ExtraLink).filter(ExtraLink.key == key).first()
     if not link:
         raise HTTPException(status_code=404, detail="Link não encontrado.")
@@ -3315,7 +3337,22 @@ def admin_update_extra_link(
         link.label = body.label.strip()
     if body.url is not None:
         link.url = body.url.strip()
+    if body.icon is not None:
+        link.icon = body.icon
     if body.is_active is not None:
         link.is_active = body.is_active
     db.commit()
-    return {"key": link.key, "label": link.label, "url": link.url, "is_active": link.is_active}
+    return {"key": link.key, "label": link.label, "url": link.url, "icon": link.icon, "is_active": link.is_active}
+
+
+@app.delete("/api/platform/admin/extra-links/{key}", status_code=204)
+def admin_delete_extra_link(
+    key: str,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(get_current_admin),
+):
+    link = db.query(ExtraLink).filter(ExtraLink.key == key).first()
+    if not link:
+        raise HTTPException(status_code=404, detail="Link não encontrado.")
+    db.delete(link)
+    db.commit()

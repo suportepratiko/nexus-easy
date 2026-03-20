@@ -153,9 +153,10 @@ class ExtraLink(Base):
     __tablename__ = "extra_links"
 
     id = Column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
-    key = Column(String(64), nullable=False, unique=True)   # sala_premium | indicador
-    label = Column(String(100), nullable=False)             # Nome exibido na sidebar
+    key = Column(String(64), nullable=False, unique=True)
+    label = Column(String(100), nullable=False)
     url = Column(String(2000), nullable=False, server_default=text("''"))
+    icon = Column(String(64), nullable=False, server_default=text("'Link'"))
     is_active = Column(Boolean, nullable=False, server_default=text("true"))
     sort_order = Column(Integer, nullable=False, server_default=text("0"))
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
@@ -365,9 +366,11 @@ def init_db() -> None:
                 key VARCHAR(64) NOT NULL UNIQUE,
                 label VARCHAR(100) NOT NULL,
                 url VARCHAR(2000) NOT NULL DEFAULT '',
+                icon VARCHAR(64) NOT NULL DEFAULT 'Link',
                 is_active BOOLEAN NOT NULL DEFAULT true,
                 sort_order INTEGER NOT NULL DEFAULT 0,
                 updated_at TIMESTAMPTZ DEFAULT now()
             )
         """))
+        conn.execute(text("ALTER TABLE extra_links ADD COLUMN IF NOT EXISTS icon VARCHAR(64) NOT NULL DEFAULT 'Link'"))
 

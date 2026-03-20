@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
-import { TrendingUp, Settings, Link2, User, Headphones, Shield, Users, Webhook, Package, Trophy, Sparkles, FileText, Bell, Wrench, Mail, ExternalLink, Crown, BarChart2 } from "lucide-react";
+import { TrendingUp, Settings, Link2, User, Headphones, Shield, Users, Webhook, Package, Trophy, Sparkles, FileText, Bell, Wrench, Mail, ExternalLink } from "lucide-react";
+import * as LucideIcons from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useBot } from "@/modules/bot/BotProvider";
 import { useAuth } from "@/contexts/AuthContext";
@@ -39,10 +40,11 @@ const adminNavItems = [
   { title: "Links Extras", url: "/admin/links", icon: Link2 },
 ];
 
-const EXTRA_LINK_ICONS: Record<string, React.ElementType> = {
-  sala_premium: Crown,
-  indicador: BarChart2,
-};
+function getExtraIcon(name: string): React.ElementType {
+  const icon = (LucideIcons as Record<string, unknown>)[name];
+  if (typeof icon === "function" || (typeof icon === "object" && icon !== null)) return icon as React.ElementType;
+  return LucideIcons.Link;
+}
 
 export function AppSidebar() {
   const { state } = useSidebar();
@@ -76,7 +78,7 @@ export function AppSidebar() {
       .catch(() => setSidebarBalance(null));
   }, [isAdminRoute, isSafirionConnected, isRunning]);
 
-  const [extraLinks, setExtraLinks] = useState<{ key: string; label: string; url: string }[]>([]);
+  const [extraLinks, setExtraLinks] = useState<{ key: string; label: string; url: string; icon: string }[]>([]);
 
   useEffect(() => {
     const token = getPlatformToken();
@@ -160,7 +162,7 @@ export function AppSidebar() {
             <SidebarGroupContent>
               <SidebarMenu className="space-y-0.5">
                 {extraLinks.map((item) => {
-                  const Icon = EXTRA_LINK_ICONS[item.key] ?? ExternalLink;
+                  const Icon = getExtraIcon(item.icon ?? "Link");
                   return (
                     <SidebarMenuItem key={item.key}>
                       <a
