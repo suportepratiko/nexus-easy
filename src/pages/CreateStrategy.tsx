@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   createCustomStrategy,
   updateCustomStrategy,
@@ -868,11 +868,26 @@ function RuleEditor({
               <SelectValue />
             </SelectTrigger>
             <SelectContent className="max-h-[70vh]">
-              {(Object.keys(RULE_TYPE_LABELS) as RuleType[]).map((t) => (
-                <SelectItem key={t} value={t} className="py-2.5">
-                  {RULE_TYPE_LABELS[t]}
-                </SelectItem>
-              ))}
+              <SelectGroup>
+                <SelectLabel className="text-xs font-bold text-muted-foreground uppercase tracking-wider px-2 py-1.5">
+                  🕯️ Velas
+                </SelectLabel>
+                {(["candle_body", "consecutive", "wick_size", "breakout", "candle_compare", "engulfment", "candle_color"] as RuleType[]).map((t) => (
+                  <SelectItem key={t} value={t} className="py-2.5">
+                    {RULE_TYPE_LABELS[t]}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+              <SelectGroup>
+                <SelectLabel className="text-xs font-bold text-muted-foreground uppercase tracking-wider px-2 py-1.5 mt-1">
+                  📊 Indicadores
+                </SelectLabel>
+                {(["rsi", "bollinger", "ema_cross", "sma_cross", "macd", "ma_compare"] as RuleType[]).map((t) => (
+                  <SelectItem key={t} value={t} className="py-2.5">
+                    {RULE_TYPE_LABELS[t]}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
             </SelectContent>
           </Select>
         </div>
