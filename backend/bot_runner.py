@@ -1642,7 +1642,24 @@ def _run_bot(token: str, s, config: dict) -> None:
                     continue
 
                 balance_before = s.get_balance() or current_balance
-                
+
+                # --- VALIDAÇÃO DE SALDO SUFICIENTE ANTES DE ENTRAR ---
+                # Se o saldo atual for menor que o valor da entrada, para o robô.
+                if float(balance_before) < float(price):
+                    logging.warning(
+                        "bot_runner: SALDO INSUFICIENTE — saldo=%.2f entrada=%.2f | parando robô.",
+                        float(balance_before), float(price)
+                    )
+                    state["running"] = False
+                    state["stop_reason"] = "insufficient_balance"
+                    _trigger_push_event(token, "stop_loss", {
+                        "profit": f"{total_profit:+.2f}",
+                        "entries": str(len(operations)),
+                        "wins": str(sum(1 for o in operations if o.get("result") == "win")),
+                        "losses": str(sum(1 for o in operations if o.get("result") == "loss")),
+                    })
+                    break
+
                 # --- VALIDAÇÃO DE PREÇO ANTES DE ENTRAR (GUARDA DE SEGURANÇA) ---
                 # COMPRA (CALL): preço atual deve ser <= abertura da vela
                 # VENDA (PUT): preço atual deve ser >= abertura da vela
