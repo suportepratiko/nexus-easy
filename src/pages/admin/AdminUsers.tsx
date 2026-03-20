@@ -144,6 +144,12 @@ export default function AdminUsersPage() {
     inactive: number;
     expiring_in_7_days: number;
   } | null>(null);
+  const [baseStats, setBaseStats] = useState<{
+    total: number;
+    active: number;
+    inactive: number;
+    expiring_in_7_days: number;
+  } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -176,6 +182,19 @@ export default function AdminUsersPage() {
     return opts;
   }, [plans]);
 
+  const loadStats = useCallback(() => {
+    getAdminUsers(undefined)
+      .then((res) => {
+        setBaseStats({
+          total: res.total,
+          active: res.active,
+          inactive: res.inactive,
+          expiring_in_7_days: res.expiring_in_7_days,
+        });
+      })
+      .catch(() => {});
+  }, []);
+
   const loadUsers = useCallback(() => {
     setLoading(true);
     setError(null);
@@ -196,6 +215,10 @@ export default function AdminUsersPage() {
   }, [search]);
 
   useEffect(() => {
+    loadStats();
+  }, [loadStats]);
+
+  useEffect(() => {
     setCurrentPage(1);
     const t = setTimeout(() => loadUsers(), 300);
     return () => clearTimeout(t);
@@ -203,10 +226,10 @@ export default function AdminUsersPage() {
 
   // Atualiza a lista ao voltar para a aba (ex.: após criar usuário via webhook)
   useEffect(() => {
-    const onFocus = () => loadUsers();
+    const onFocus = () => { loadUsers(); loadStats(); };
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
-  }, [loadUsers]);
+  }, [loadUsers, loadStats]);
 
   const handleDeleteConfirm = () => {
     if (!userToDelete) return;
@@ -215,6 +238,7 @@ export default function AdminUsersPage() {
       .then(() => {
         setUserToDelete(null);
         loadUsers();
+        loadStats();
       })
       .catch((e: { detail?: string }) => {
         setError(e?.detail ?? "Erro ao excluir.");
@@ -223,7 +247,6 @@ export default function AdminUsersPage() {
   };
 
   const openCreate = () => {
-    setSearch("");
     setForm(emptyUserForm);
     setFormError(null);
     setCreateOpen(true);
@@ -278,8 +301,8 @@ export default function AdminUsersPage() {
     createAdminUser(payload)
       .then(() => {
         closeForm();
-        setSearch("");
         loadUsers();
+        loadStats();
       })
       .catch((e: { detail?: string }) => {
         setFormError(e?.detail ?? "Erro ao criar usuário.");
@@ -308,8 +331,8 @@ export default function AdminUsersPage() {
     updateAdminUser(editUser.id, payload)
       .then(() => {
         closeForm();
-        setSearch("");
         loadUsers();
+        loadStats();
       })
       .catch((e: { detail?: string }) => {
         setFormError(e?.detail ?? "Erro ao atualizar.");
@@ -337,11 +360,12 @@ export default function AdminUsersPage() {
   }
 
   const cardBaseClass = "border-border/60 bg-card/80";
+  const stats = baseStats ?? data;
   const cards = [
-    { title: "Total de usuários", value: data?.total ?? 0, icon: Users, valueClass: "text-foreground", iconClass: "text-muted-foreground" },
-    { title: "Usuários ativos", value: data?.active ?? 0, icon: UserCheck, valueClass: "text-green-600 dark:text-green-400", iconClass: "text-green-600 dark:text-green-400" },
-    { title: "Usuários inativos", value: data?.inactive ?? 0, icon: UserX, valueClass: "text-red-600 dark:text-red-400", iconClass: "text-red-600 dark:text-red-400" },
-    { title: "A vencer em 7 dias", value: data?.expiring_in_7_days ?? 0, icon: CalendarClock, valueClass: "text-amber-600 dark:text-amber-400", iconClass: "text-amber-600 dark:text-amber-400" },
+    { title: "Total de usuários", value: stats?.total ?? 0, icon: Users, valueClass: "text-foreground", iconClass: "text-muted-foreground" },
+    { title: "Usuários ativos", value: stats?.active ?? 0, icon: UserCheck, valueClass: "text-green-600 dark:text-green-400", iconClass: "text-green-600 dark:text-green-400" },
+    { title: "Usuários inativos", value: stats?.inactive ?? 0, icon: UserX, valueClass: "text-red-600 dark:text-red-400", iconClass: "text-red-600 dark:text-red-400" },
+    { title: "A vencer em 7 dias", value: stats?.expiring_in_7_days ?? 0, icon: CalendarClock, valueClass: "text-amber-600 dark:text-amber-400", iconClass: "text-amber-600 dark:text-amber-400" },
   ];
 
   const allUsers = data?.users ?? [];
@@ -606,7 +630,7 @@ export default function AdminUsersPage() {
           <DialogHeader>
             <DialogTitle>{editUser ? "Editar usuário" : "Criar usuário"}</DialogTitle>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
+          <form autoComplete="off" onSubmit={(e) => e.preventDefault()} className="grid gap-4 py-4">
             {formError && (
               <p className="text-sm text-destructive bg-destructive/10 rounded-md px-3 py-2">{formError}</p>
             )}
@@ -706,7 +730,7 @@ export default function AdminUsersPage() {
                 <option value="admin">Admin</option>
               </select>
             </div>
-          </div>
+          </form>
           <DialogFooter>
             <Button variant="outline" onClick={closeForm} disabled={formLoading}>
               Cancelar
