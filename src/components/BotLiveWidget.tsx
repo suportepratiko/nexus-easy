@@ -6,25 +6,40 @@ import type { OperationLog } from "@/modules/bot/schemas";
 import type { StopReason } from "@/modules/bot/hooks/useBotState";
 import { PictureInPicture2, X, GripVertical, Trophy, ShieldOff, Eye, EyeOff } from "lucide-react";
 
-/** Mesmo algoritmo do Dashboard: ciclo começa em martingaleLevel=0 */
-function cycleStats(ops: OperationLog[]) {
-  const cycles: OperationLog[][] = [];
+/** Ciclos completos: só conta win/loss quando o ciclo foi definitivamente encerrado.
+ *  Um ciclo com loss só é contado se:
+ *  - Um novo ciclo (level=0) começou DEPOIS dele (foi fechado pelo loop), OU
+ *  - O robô parou (!isRunning) — nesse caso o último ciclo também é final.
+ *  Wins são sempre definitivos (encerram o ciclo imediatamente).
+ */
+function cycleStats(ops: OperationLog[], isRunning: boolean) {
+  // Ciclos fechados = aqueles em que um novo ciclo (level=0) iniciou depois
+  const closedCycles: OperationLog[][] = [];
   let current: OperationLog[] = [];
   for (const op of ops) {
     if (op.martingaleLevel === 0 && current.length > 0) {
-      cycles.push(current);
+      closedCycles.push(current);
       current = [];
     }
     current.push(op);
   }
-  if (current.length > 0) cycles.push(current);
 
-  const entradas = cycles.filter((c) => {
+  // O ciclo atual (current) só é contabilizado se:
+  // - Terminou em win (definitivo), OU
+  // - O robô parou (não virá mais martingale)
+  const lastCycleResult = current.length > 0 ? current[current.length - 1]?.result : null;
+  const lastCycleCountable =
+    current.length > 0 &&
+    (lastCycleResult === "win" || !isRunning);
+
+  const countable = lastCycleCountable ? [...closedCycles, current] : closedCycles;
+
+  const entradas = countable.filter((c) => {
     const last = c[c.length - 1];
     return last && last.result !== "pending" && last.result !== "draw";
   }).length;
-  const wins = cycles.filter((c) => c[c.length - 1]?.result === "win").length;
-  const losses = cycles.filter((c) => c[c.length - 1]?.result === "loss").length;
+  const wins = countable.filter((c) => c[c.length - 1]?.result === "win").length;
+  const losses = countable.filter((c) => c[c.length - 1]?.result === "loss").length;
   return { entradas, wins, losses };
 }
 
@@ -48,7 +63,7 @@ function WidgetContent({
   operations, totalProfit, currentBalance, isRunning, stopReason,
   flashResult, onMouseDown, onPiP, onClose, inPip, hideValues, onToggleHide,
 }: ContentProps) {
-  const { entradas, wins, losses } = cycleStats(operations);
+  const { entradas, wins, losses } = cycleStats(operations, isRunning);
   const winRate = entradas > 0 ? ((wins / entradas) * 100).toFixed(1) : "0.0";
   const lastOp = operations[operations.length - 1];
   const profitSign = totalProfit >= 0 ? "+" : "";
