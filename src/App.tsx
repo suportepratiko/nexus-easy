@@ -27,6 +27,7 @@ import RankingPage from "./pages/Ranking";
 import MyProfilePage from "./pages/MyProfile";
 import NotFound from "./pages/NotFound";
 import PlansLanding from "./pages/PlansLanding";
+import { ChatwootWidget } from "@/components/ChatwootWidget";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -49,6 +50,7 @@ const App = () => (
         }}
       >
         <PlatformAuthProvider>
+          <ChatwootWidget />
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/planos" element={<PlansLanding />} />
