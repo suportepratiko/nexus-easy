@@ -1013,12 +1013,20 @@ def reconnect(current_user: User = Depends(get_current_user)):
 
 
 @app.post("/api/auth/logout")
-def logout(request: Request):
-    """Invalida a sessão atual."""
+def logout(request: Request, db: Session = Depends(get_db)):
+    """Invalida a sessão atual e apaga a senha salva da corretora (para que o auto-reconnect não relogue automaticamente)."""
     auth = request.headers.get("Authorization") or request.headers.get("authorization")
     token = get_session_token(auth)
     if token:
         _broker_sessions.close_session(token)
+    # Apaga a senha salva para impedir auto-reconnect em outro dispositivo.
+    # O broker_email é mantido (necessário para notificações PWA).
+    try:
+        user = get_current_user(request, db)
+        user.broker_password = None
+        db.commit()
+    except Exception:
+        pass
     return {"message": "Logout realizado."}
 
 
