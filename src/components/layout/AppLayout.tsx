@@ -34,6 +34,11 @@ export function AppLayout({ children }: { children: ReactNode }) {
           <header className="relative h-14 flex items-center justify-between border-b border-border px-4 bg-card/80 backdrop-blur-md sticky top-0 z-40">
             <div className="flex items-center gap-3">
               <SidebarTrigger className="text-muted-foreground hover:text-foreground" />
+              <img
+                src="/logos/logo.png"
+                alt="Nexus Bot"
+                className="h-7 w-auto object-contain md:hidden"
+              />
             </div>
             <div className="flex items-center gap-2">
               <TooltipProvider delayDuration={300}>

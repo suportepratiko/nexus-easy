@@ -62,7 +62,7 @@ function TutorialContent({ platform }: { platform: InstallPlatform }) {
   }
 }
 
-/** Banner para usuário no navegador (não PWA) com opção de ver tutorial de instalação Android/iOS. */
+/** Banner para usuário no navegador mobile (Android/iOS) com opção de ver tutorial de instalação. */
 export function InstallAppBanner() {
   const [visible, setVisible] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -70,6 +70,12 @@ export function InstallAppBanner() {
 
   useEffect(() => {
     if (isPwaStandalone()) {
+      setVisible(false);
+      return;
+    }
+    const detectedPlatform = getInstallPlatform();
+    // Mostrar apenas para usuários mobile (Android ou iOS)
+    if (detectedPlatform === "other") {
       setVisible(false);
       return;
     }
@@ -86,7 +92,7 @@ export function InstallAppBanner() {
       //
     }
     setVisible(true);
-    setPlatform(getInstallPlatform());
+    setPlatform(detectedPlatform);
   }, []);
 
   const handleDismiss = () => {
@@ -107,24 +113,33 @@ export function InstallAppBanner() {
         ? "Instalar no iPhone ou iPad"
         : "Instalar o app";
 
+  const platformLabel = platform === "ios" ? "iPhone/iPad" : "Android";
+
   return (
     <div
-      className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 py-3 bg-muted/50 border-b border-border text-foreground"
+      className="relative flex items-center justify-between gap-2 px-4 py-3 bg-primary/10 border-b border-primary/20 text-foreground"
       role="banner"
       aria-label="Instalar o app"
     >
-      <div className="flex items-center gap-2 min-w-0">
-        <Smartphone className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden />
-        <p className="text-sm font-medium">
-          Instale o app para usar no celular como um aplicativo e receber notificações.
-        </p>
+      <div className="flex items-center gap-3 min-w-0">
+        <div className="flex-shrink-0 bg-primary/20 rounded-xl p-2">
+          <Smartphone className="h-5 w-5 text-primary" aria-hidden />
+        </div>
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-foreground leading-tight">
+            Instale o Nexus Bot no seu {platformLabel}
+          </p>
+          <p className="text-xs text-muted-foreground mt-0.5 leading-tight">
+            Acesse como app nativo e receba notificações
+          </p>
+        </div>
       </div>
-      <div className="flex items-center gap-2 shrink-0">
+      <div className="flex items-center gap-1 shrink-0">
         <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
           <SheetTrigger asChild>
-            <Button variant="secondary" size="sm" className="h-8 gap-1">
-              Como instalar
-              <ChevronDown className="h-4 w-4" aria-hidden />
+            <Button variant="default" size="sm" className="h-8 text-xs px-3 gap-1">
+              Instalar
+              <ChevronDown className="h-3 w-3" aria-hidden />
             </Button>
           </SheetTrigger>
           <SheetContent side="bottom" className="rounded-t-2xl max-h-[85vh] overflow-y-auto">
