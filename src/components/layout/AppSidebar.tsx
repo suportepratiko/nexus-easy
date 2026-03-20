@@ -79,14 +79,13 @@ export function AppSidebar() {
   const [extraLinks, setExtraLinks] = useState<{ key: string; label: string; url: string }[]>([]);
 
   useEffect(() => {
-    if (isAdminRoute) return;
     const token = getPlatformToken();
     if (!token) return;
     fetch("/api/platform/extra-links", { headers: { Authorization: `Bearer ${token}` } })
       .then((r) => r.ok ? r.json() : [])
       .then(setExtraLinks)
       .catch(() => {});
-  }, [isAdminRoute]);
+  }, []);
 
   const displayName = user?.email?.split("@")[0] || "Usuário";
   const saldoNum = isRunning ? currentBalance : (sidebarBalance ?? (isSafirionConnected ? 0 : null));
@@ -153,7 +152,7 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
-        {!isAdminRoute && extraLinks.length > 0 && (
+        {extraLinks.length > 0 && (
           <SidebarGroup>
             <SidebarGroupLabel className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground px-2 mb-1.5">
               {!collapsed && "Extras"}

@@ -431,7 +431,7 @@ export default function AdminEmailPage() {
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2"><Mail className="w-6 h-6 text-primary" /> Email Marketing</h1>
+          <h1 className="text-2xl font-bold">Email Marketing</h1>
           <p className="text-muted-foreground text-sm mt-1">Configure SMTP, templates e gatilhos automáticos de email.</p>
         </div>
         <Button onClick={() => setTriggerDialog(true)} variant="outline" className="gap-2">
