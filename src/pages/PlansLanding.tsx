@@ -94,8 +94,8 @@ export default function PlansLanding() {
           <div className="pt-4">
             <a href="#planos">
               <Button size="lg" className="bg-primary text-black hover:bg-primary/90 font-bold px-10 text-base gap-2">
-                <Zap className="h-5 w-5" />
                 QUERO O NEXUS BOT
+                <ArrowRight className="h-5 w-5" />
               </Button>
             </a>
           </div>
