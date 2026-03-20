@@ -120,7 +120,7 @@ export default function PlansLanding() {
         <div className="max-w-5xl mx-auto">
           <div className="text-center mb-14">
             <h2 className="text-3xl font-bold">Escolha seu plano</h2>
-            <p className="text-slate-400 mt-3">Acesso completo ao robô. Cancele quando quiser.</p>
+            <p className="text-slate-400 mt-3">Acesso completo ao robô.</p>
           </div>
 
           {loading ? (
