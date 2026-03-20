@@ -146,9 +146,6 @@ export default function PlansLanding() {
                   <div className="flex items-center justify-center gap-3 mb-8">
                     <Star className={`h-5 w-5 ${planIdx === 0 ? "text-primary" : "text-slate-500"}`} />
                     <h3 className="text-2xl font-bold">{plan.name}</h3>
-                    {plan.description && (
-                      <span className="text-slate-400 text-sm">— {plan.description}</span>
-                    )}
                   </div>
                   <div className="flex flex-wrap justify-center gap-6">
                     {plan.periods.map((period) => {
