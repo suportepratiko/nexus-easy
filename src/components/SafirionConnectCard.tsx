@@ -66,12 +66,18 @@ export function SafirionConnectCard() {
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(true);
   // true enquanto tentamos o auto-reconnect na primeira carga (novo dispositivo)
-  const [autoConnecting, setAutoConnecting] = useState(!isAuthenticated);
+  // Usa sessionStorage para não repetir após desconect manual na mesma sessão.
+  const [autoConnecting, setAutoConnecting] = useState(
+    () => !isAuthenticated && !sessionStorage.getItem("broker_auto_tried")
+  );
 
-  // Ao montar sem token (novo dispositivo/sessão), tenta reconectar automaticamente
-  // usando as credenciais salvas no servidor. Só exibe o formulário se falhar.
+  // Ao montar sem token E sem tentativa prévia, tenta reconectar automaticamente.
+  // Se o usuário desconectou manualmente (logout apagou a senha + marca a flag),
+  // o auto-reconnect não roda e o formulário é exibido direto.
   useEffect(() => {
     if (isAuthenticated) { setAutoConnecting(false); return; }
+    if (sessionStorage.getItem("broker_auto_tried")) { setAutoConnecting(false); return; }
+    sessionStorage.setItem("broker_auto_tried", "1");
     let cancelled = false;
     reconnect()
       .catch(() => { /* sem credenciais salvas → exibe formulário */ })
@@ -108,9 +114,11 @@ export function SafirionConnectCard() {
   };
 
   const handleLogout = async () => {
+    // Marca que o usuário desconectou manualmente — impede o auto-reconnect
+    sessionStorage.setItem("broker_auto_tried", "1");
     // 1. Mata WS, para robô no backend e zera estado local
     resetBot();
-    // 2. Desloga da corretora
+    // 2. Desloga da corretora (também apaga senha salva no servidor)
     await logout();
   };
 
