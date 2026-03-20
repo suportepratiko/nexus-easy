@@ -3,7 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { usePlatformAuth } from "@/contexts/PlatformAuthContext";
 import { getPublicRanking, type PublicRankingItem } from "@/lib/api/ranking";
 import { formatBrl } from "@/lib/utils";
-import { Smartphone, Banknote, Medal, Loader2, Zap, Users, User, Crown } from "lucide-react";
+import { Smartphone, Banknote, Medal, Zap, Users, User, Crown } from "lucide-react";
+import { RankingSkeleton } from "@/components/skeletons/PageSkeletons";
 import { cn } from "@/lib/utils";
 
 const PREMIOS_MES = [
@@ -48,14 +49,7 @@ export default function RankingPage() {
     return () => clearInterval(t);
   }, [data]);
 
-  if (loading && !data) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[50vh] gap-3 text-muted-foreground">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <span>Carregando ranking…</span>
-      </div>
-    );
-  }
+  if (loading && !data) return <RankingSkeleton />;
 
   const items = data?.items ?? [];
   const periodLabel = data ? formatPeriod(data.period_start, data.period_end) : "";

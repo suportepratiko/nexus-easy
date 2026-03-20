@@ -5,6 +5,7 @@ import { Switch } from "@/components/ui/switch";
 import { getNotificationPreferences, updateNotificationPreferences, type NotificationPreferenceItem } from "@/lib/api/notifications";
 import { toast } from "sonner";
 import { Loader2, MessageSquare, Smartphone } from "lucide-react";
+import { NotificationsSkeleton } from "@/components/skeletons/PageSkeletons";
 
 /** Na UI do usuário, Stop Gain e Stop Loss aparecem como um único item. */
 const STOP_GROUP_KEYS = ["stop_gain", "stop_loss"];
@@ -65,14 +66,7 @@ export default function NotificationsPage() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[40vh] gap-2 text-muted-foreground">
-        <Loader2 className="h-5 w-5 animate-spin" />
-        <span>Carregando…</span>
-      </div>
-    );
-  }
+  if (loading) return <NotificationsSkeleton />;
 
   return (
     <div className="space-y-6">

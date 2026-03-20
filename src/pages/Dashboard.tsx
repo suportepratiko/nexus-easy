@@ -15,6 +15,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { DashboardSkeleton } from "@/components/skeletons/PageSkeletons";
 import {
   Activity,
   TrendingUp,
@@ -70,7 +71,7 @@ function cycleStats(ops: OperationLog[]): { entradas: number; wins: number; loss
 }
 
 export default function DashboardPage() {
-  const { status, stopReason, operations, totalProfit, currentBalance, config, stopBot, resetBot, showLiveWidget, setShowLiveWidget } = useBot();
+  const { status, stopReason, operations, totalProfit, currentBalance, config, stopBot, resetBot, showLiveWidget, setShowLiveWidget, initializing } = useBot();
   const { isAuthenticated: isBrokerConnected } = useAuth();
   const navigate = useNavigate();
   const { status: pushStatus, error: pushError, enable: enablePush } = usePushNotifications();
@@ -222,6 +223,8 @@ export default function DashboardPage() {
       color: "text-destructive",
     },
   ];
+
+  if (initializing) return <DashboardSkeleton />;
 
   // PRIORIDADE 1: Dashboard quando o robô está operando (sempre mostra primeiro)
   if (isRunning) {

@@ -44,6 +44,7 @@ import {
 } from "@/lib/strategyBuilder";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
   DialogContent,
@@ -681,9 +682,19 @@ export default function CreateStrategyPage() {
         </CardHeader>
         <CardContent className="space-y-3">
           {loadingList ? (
-            <div className="flex items-center justify-center py-8 gap-2 text-muted-foreground">
-              <Loader2 className="h-5 w-5 animate-spin" />
-              Carregando...
+            <div className="space-y-2 animate-pulse">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-4 rounded-lg border border-border px-4 py-3">
+                  <div className="flex-1 space-y-1.5">
+                    <Skeleton className="h-4 w-36" />
+                    <Skeleton className="h-3 w-52" />
+                  </div>
+                  <Skeleton className="h-5 w-8 rounded-full" />
+                  <div className="flex gap-1.5">
+                    {Array.from({ length: 4 }).map((_, j) => <Skeleton key={j} className="h-8 w-8 rounded-md" />)}
+                  </div>
+                </div>
+              ))}
             </div>
           ) : strategies.length === 0 ? (
             <div className="rounded-lg border border-dashed border-border/60 py-10 text-center">

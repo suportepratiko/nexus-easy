@@ -53,6 +53,7 @@ export function useBotState() {
   const [config, setConfig] = useState<StrategyConfig | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showLiveWidget, setShowLiveWidget] = useState(false);
+  const [initializing, setInitializing] = useState(true);
 
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectRef = useRef<number>(0);
@@ -131,7 +132,7 @@ export function useBotState() {
     if (isAdminRoute) return;
 
     // Initial load
-    getBotStatus().then(syncFromStatus).catch(() => { });
+    getBotStatus().then(syncFromStatus).catch(() => {}).finally(() => setInitializing(false));
 
     // Connect WS
     connectWS();
@@ -250,6 +251,7 @@ export function useBotState() {
     currentBalance,
     config,
     error,
+    initializing,
     showLiveWidget,
     setShowLiveWidget,
     startBot,

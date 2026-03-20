@@ -30,6 +30,7 @@ import { getBalances, getPlatformBotConfig, savePlatformBotConfig } from "@/lib/
 import { listCustomStrategies } from "@/lib/api/strategies";
 import type { CustomStrategy } from "@/lib/api/strategies";
 import { formatBrl } from "@/lib/utils";
+import { BotConfigSkeleton } from "@/components/skeletons/PageSkeletons";
 
 const MODE_OPTIONS: { value: CalculationMode; label: string; icon: typeof DollarSign }[] = [
   { value: "gross_value", label: "Valor (R$)", icon: DollarSign },
@@ -61,7 +62,7 @@ const STRATEGY_OPTIONS: { value: StrategyType; label: string; description: strin
 
 export default function BotConfigPage() {
   const navigate = useNavigate();
-  const { startBot, stopBot, status, error: botError } = useBot();
+  const { startBot, stopBot, status, error: botError, initializing } = useBot();
   const { isAuthenticated: isBrokerConnected } = useAuth();
   const isRunning = status === "running";
 
@@ -257,6 +258,8 @@ export default function BotConfigPage() {
     stopLossMode === "percentage" && effectiveBankroll > 0 && stopLossPercent > 0
       ? (effectiveBankroll * stopLossPercent) / 100
       : null;
+
+  if (initializing) return <BotConfigSkeleton />;
 
   // Se não estiver conectado na corretora, mostra apenas o card de login (igual à Dashboard)
   if (!isBrokerConnected) {
