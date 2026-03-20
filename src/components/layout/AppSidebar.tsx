@@ -155,8 +155,7 @@ export function AppSidebar() {
         </SidebarGroup>
         {!isAdminRoute && extraLinks.length > 0 && (
           <SidebarGroup>
-            <SidebarGroupLabel className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground px-2 mb-1.5 flex items-center gap-1.5">
-              <ExternalLink className="h-3.5 w-3.5" />
+            <SidebarGroupLabel className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground px-2 mb-1.5">
               {!collapsed && "Extras"}
             </SidebarGroupLabel>
             <SidebarGroupContent>
