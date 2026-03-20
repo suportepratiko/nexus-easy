@@ -464,7 +464,7 @@ def get_plans_public(db: Session = Depends(get_db)):
             "periods": [
                 {
                     "period_type": pp.period_type,
-                    "price": float(pp.price_cents) / 100 if pp.price_cents else 0,
+                    "price": float(pp.price_cents) if pp.price_cents else 0,
                     "checkout_url": pp.checkout_url,
                 }
                 for pp in periods
