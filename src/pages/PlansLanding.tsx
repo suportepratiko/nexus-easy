@@ -34,10 +34,9 @@ function formatPrice(price: number) {
   return price.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
-function pricePerMonth(price: number, type: string) {
+function monthlyPrice(price: number, type: string) {
   const months = PERIOD_MONTHS[type] ?? 1;
-  if (months <= 1) return null;
-  return formatPrice(price / months) + "/mês";
+  return formatPrice(price / months);
 }
 
 export default function PlansLanding() {
@@ -136,48 +135,64 @@ export default function PlansLanding() {
             <div className="space-y-10">
               {plans.map((plan, planIdx) => (
                 <div key={plan.id}>
-                  <div className="flex items-center gap-3 mb-5">
+                  <div className="flex items-center justify-center gap-3 mb-8">
                     <Star className={`h-5 w-5 ${planIdx === 0 ? "text-primary" : "text-slate-500"}`} />
-                    <h3 className="text-xl font-bold">{plan.name}</h3>
+                    <h3 className="text-2xl font-bold">{plan.name}</h3>
                     {plan.description && (
                       <span className="text-slate-400 text-sm">— {plan.description}</span>
                     )}
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="flex flex-wrap justify-center gap-6">
                     {plan.periods.map((period) => {
-                      const perMonth = pricePerMonth(period.price, period.period_type);
-                      const isPopular = period.period_type === "quarterly";
+                      const isAnnual = (PERIOD_MONTHS[period.period_type] ?? 1) > 1;
+                      const perMonth = monthlyPrice(period.price, period.period_type);
+                      const isPopular = period.period_type === "annual";
                       return (
                         <div
                           key={period.period_type}
-                          className={`relative rounded-xl border p-6 flex flex-col gap-4 transition-all ${
+                          className={`relative rounded-2xl border p-8 flex flex-col gap-5 transition-all w-full max-w-xs ${
                             isPopular
-                              ? "border-primary bg-primary/5 shadow-lg shadow-primary/10"
+                              ? "border-primary bg-primary/5 shadow-xl shadow-primary/10"
                               : "border-white/8 bg-[#111] hover:border-white/20"
                           }`}
                         >
                           {isPopular && (
-                            <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-black text-xs font-bold px-3 py-0.5 rounded-full">
-                              Mais popular
+                            <span className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-primary text-black text-xs font-bold px-4 py-1 rounded-full whitespace-nowrap">
+                              Melhor custo-benefício
                             </span>
                           )}
                           <div>
-                            <p className="text-slate-400 text-sm font-medium">{PERIOD_LABELS[period.period_type] ?? period.period_type}</p>
-                            <p className="text-3xl font-bold mt-1 text-white">{formatPrice(period.price)}</p>
-                            {perMonth && (
-                              <p className="text-primary text-xs mt-1">{perMonth}</p>
+                            <p className="text-slate-400 text-sm font-medium uppercase tracking-wide">
+                              {PERIOD_LABELS[period.period_type] ?? period.period_type}
+                            </p>
+                            <div className="flex items-end gap-1 mt-2">
+                              <p className="text-4xl font-extrabold text-white">{perMonth}</p>
+                              <span className="text-slate-400 text-sm mb-1">/mês</span>
+                            </div>
+                            {isAnnual && (
+                              <p className="text-slate-500 text-xs mt-1">
+                                {formatPrice(period.price)} cobrado anualmente
+                              </p>
                             )}
                           </div>
-                          <ul className="space-y-2 text-sm text-slate-300 flex-1">
-                            {["Acesso completo ao robô", "Suporte incluso", "Stop Gain/Loss automático", "Histórico de operações"].map(f => (
-                              <li key={f} className="flex items-center gap-2">
-                                <CheckCircle2 className="h-3.5 w-3.5 text-primary shrink-0" />
+                          <ul className="space-y-3 text-sm text-slate-300 flex-1">
+                            {[
+                              "Robô 100% automático",
+                              "Operações automatizadas",
+                              "Gerenciamento completo automático",
+                              "Stop Gain e Stop Loss automático",
+                              "Histórico de operações",
+                              "Ranking com premiações",
+                            ].map(f => (
+                              <li key={f} className="flex items-center gap-2.5">
+                                <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
                                 {f}
                               </li>
                             ))}
                           </ul>
                           <Button
-                            className={`w-full font-semibold ${
+                            size="lg"
+                            className={`w-full font-semibold mt-2 ${
                               isPopular
                                 ? "bg-primary text-black hover:bg-primary/90"
                                 : "bg-white/10 hover:bg-white/20 text-white"
