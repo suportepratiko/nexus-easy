@@ -225,6 +225,14 @@ export default function BotConfigPage() {
     if (realBalance !== null && realBalance > 0) {
       cfg.bankroll = realBalance;
     }
+    // Verifica se o saldo é suficiente para pelo menos uma entrada
+    if (realBalance !== null && cfg.entryValue > realBalance) {
+      toast.error(
+        `Saldo insuficiente. Sua banca atual é R$ ${realBalance.toFixed(2)} e o valor de entrada é R$ ${cfg.entryValue.toFixed(2)}. Reduza o valor de entrada ou recarregue sua conta.`,
+        { duration: 6000 }
+      );
+      return;
+    }
     startBot(cfg);
     toast.success("Robô iniciado. Operando na corretora.");
     navigate("/");

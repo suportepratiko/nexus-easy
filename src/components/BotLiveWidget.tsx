@@ -4,7 +4,7 @@ import { useBot } from "@/modules/bot/BotProvider";
 import { formatBrl } from "@/lib/utils";
 import type { OperationLog } from "@/modules/bot/schemas";
 import type { StopReason } from "@/modules/bot/hooks/useBotState";
-import { PictureInPicture2, X, GripVertical, Trophy, ShieldOff } from "lucide-react";
+import { PictureInPicture2, X, GripVertical, Trophy, ShieldOff, Eye, EyeOff } from "lucide-react";
 
 /** Mesmo algoritmo do Dashboard: ciclo começa em martingaleLevel=0 */
 function cycleStats(ops: OperationLog[]) {
@@ -40,11 +40,13 @@ interface ContentProps {
   onPiP?: () => void;
   onClose?: () => void;
   inPip?: boolean;
+  hideValues: boolean;
+  onToggleHide: () => void;
 }
 
 function WidgetContent({
   operations, totalProfit, currentBalance, isRunning, stopReason,
-  flashResult, onMouseDown, onPiP, onClose, inPip,
+  flashResult, onMouseDown, onPiP, onClose, inPip, hideValues, onToggleHide,
 }: ContentProps) {
   const { entradas, wins, losses } = cycleStats(operations);
   const winRate = entradas > 0 ? ((wins / entradas) * 100).toFixed(1) : "0.0";
@@ -55,6 +57,8 @@ function WidgetContent({
   const isStopGain = stopReason === "stop_gain";
   const isStopLoss = stopReason === "stop_loss";
   const hasStopped = isStopGain || isStopLoss;
+
+  const mask = "••••";
 
   return (
     <div style={{
@@ -91,6 +95,20 @@ function WidgetContent({
             </span>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            {/* Botão olho — ocultar/mostrar valores em R$ */}
+            <button
+              onClick={onToggleHide}
+              title={hideValues ? "Mostrar valores" : "Ocultar valores"}
+              style={{
+                background: "none", border: "none", padding: "2px 4px",
+                cursor: "pointer", display: "flex", alignItems: "center",
+                color: "rgba(255,255,255,0.25)", opacity: 0.7,
+              }}
+            >
+              {hideValues
+                ? <EyeOff size={11} />
+                : <Eye size={11} />}
+            </button>
             {onPiP && !inPip && (
               <button onClick={onPiP} title="Flutuar sobre todas as janelas" style={{
                 background: "rgba(255,255,255,0.08)", border: "none", borderRadius: 6,
@@ -124,16 +142,10 @@ function WidgetContent({
             textAlign: "center",
           }}>
             <div style={{
-              fontSize: 13,
-              fontWeight: 800,
+              fontSize: 13, fontWeight: 800,
               color: isStopGain ? "#4ade80" : "#f87171",
-              letterSpacing: 1.5,
-              textTransform: "uppercase",
-              marginBottom: 2,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 6,
+              letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 2,
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
             }}>
               {isStopGain
                 ? <><Trophy size={14} color="#4ade80" /> Stop Gain Atingido!</>
@@ -153,9 +165,7 @@ function WidgetContent({
             <div style={{ position: "relative", marginBottom: 10 }}>
               <img src="/botgrande.gif" alt="Bot" style={{
                 width: 140, height: 140,
-                borderRadius: 0,
-                border: "none",
-                background: "transparent",
+                borderRadius: 0, border: "none", background: "transparent",
                 opacity: hasStopped ? 0.6 : 1,
               }} />
               {isRunning && (
@@ -163,8 +173,7 @@ function WidgetContent({
                   position: "absolute", bottom: 2, right: 2,
                   width: 14, height: 14, background: "#22c55e",
                   borderRadius: "50%", border: "2px solid #0f1117",
-                  animation: "liveping 1.4s ease-in-out infinite",
-                  display: "block",
+                  animation: "liveping 1.4s ease-in-out infinite", display: "block",
                 }} />
               )}
             </div>
@@ -202,78 +211,16 @@ function WidgetContent({
             </div>
           </div>
 
-          {/* Profit */}
-          <div style={{
-            background: totalProfit > 0
-              ? "rgba(34,197,94,0.07)"
-              : totalProfit < 0
-              ? "rgba(239,68,68,0.07)"
-              : "rgba(255,255,255,0.04)",
-            border: `1px solid ${totalProfit > 0 ? "rgba(34,197,94,0.2)" : totalProfit < 0 ? "rgba(239,68,68,0.2)" : "rgba(255,255,255,0.08)"}`,
-            borderRadius: 12, padding: "10px 14px", marginBottom: 10, textAlign: "center",
-          }}>
-            <div style={{
-              fontSize: 10, color: "rgba(255,255,255,0.45)", fontWeight: 600,
-              letterSpacing: 1.2, textTransform: "uppercase", marginBottom: 4,
-            }}>
-              Lucro da sessão
-            </div>
-            <div style={{
-              fontSize: 28, fontWeight: 800, color: profitColor,
-              letterSpacing: -1, lineHeight: 1,
-              fontVariantNumeric: "tabular-nums",
-              fontFeatureSettings: '"tnum"',
-            }}>
-              {profitSign}R$ {formatBrl(totalProfit)}
-            </div>
-          </div>
-
-          {/* Stats grid */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 5, marginBottom: 6 }}>
-            {[
-              { label: "Win Rate", value: `${winRate}%`, color: winRate === "0.0" ? "rgba(255,255,255,0.7)" : Number(winRate) >= 50 ? "#4ade80" : "#f87171" },
-              { label: "Entradas", value: `${entradas}`, color: "rgba(255,255,255,0.85)" },
-              { label: "Saldo", value: `R$\u00A0${formatBrl(currentBalance)}`, color: "rgba(255,255,255,0.85)" },
-            ].map((s) => (
-              <div key={s.label} style={{
-                background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)",
-                borderRadius: 10, padding: "7px 5px", textAlign: "center",
-              }}>
-                <div style={{
-                  fontSize: 9, color: "rgba(255,255,255,0.3)", fontWeight: 600,
-                  letterSpacing: 0.8, textTransform: "uppercase", marginBottom: 4,
-                }}>
-                  {s.label}
-                </div>
-                <div style={{
-                  fontSize: 12, fontWeight: 700, color: s.color,
-                  fontVariantNumeric: "tabular-nums",
-                  fontFeatureSettings: '"tnum"',
-                  lineHeight: 1,
-                }}>
-                  {s.value}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* WIN / LOSS */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 5, marginBottom: 10 }}>
+          {/* WIN / LOSS — primeiro */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 5, marginBottom: 6 }}>
             <div style={{
               background: "rgba(34,197,94,0.07)", border: "1px solid rgba(34,197,94,0.15)",
               borderRadius: 10, padding: "8px 6px", textAlign: "center",
             }}>
-              <div style={{
-                fontSize: 9, color: "rgba(34,197,94,0.6)", fontWeight: 700,
-                letterSpacing: 1, textTransform: "uppercase", marginBottom: 3,
-              }}>
+              <div style={{ fontSize: 9, color: "rgba(34,197,94,0.6)", fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", marginBottom: 3 }}>
                 Wins
               </div>
-              <div style={{
-                fontSize: 22, fontWeight: 800, color: "#4ade80", lineHeight: 1,
-                fontVariantNumeric: "tabular-nums",
-                fontFeatureSettings: '"tnum"',
-              }}>
+              <div style={{ fontSize: 22, fontWeight: 800, color: "#4ade80", lineHeight: 1, fontVariantNumeric: "tabular-nums", fontFeatureSettings: '"tnum"' }}>
                 {wins}
               </div>
             </div>
@@ -281,23 +228,59 @@ function WidgetContent({
               background: "rgba(239,68,68,0.07)", border: "1px solid rgba(239,68,68,0.15)",
               borderRadius: 10, padding: "8px 6px", textAlign: "center",
             }}>
-              <div style={{
-                fontSize: 9, color: "rgba(239,68,68,0.6)", fontWeight: 700,
-                letterSpacing: 1, textTransform: "uppercase", marginBottom: 3,
-              }}>
+              <div style={{ fontSize: 9, color: "rgba(239,68,68,0.6)", fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", marginBottom: 3 }}>
                 Loss
               </div>
-              <div style={{
-                fontSize: 22, fontWeight: 800, color: "#f87171", lineHeight: 1,
-                fontVariantNumeric: "tabular-nums",
-                fontFeatureSettings: '"tnum"',
-              }}>
+              <div style={{ fontSize: 22, fontWeight: 800, color: "#f87171", lineHeight: 1, fontVariantNumeric: "tabular-nums", fontFeatureSettings: '"tnum"' }}>
                 {losses}
               </div>
             </div>
           </div>
 
-          {/* Last op */}
+          {/* Stats grid — Win Rate, Entradas, Saldo */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 5, marginBottom: 6 }}>
+            {[
+              { label: "Win Rate", value: `${winRate}%`, color: winRate === "0.0" ? "rgba(255,255,255,0.7)" : Number(winRate) >= 50 ? "#4ade80" : "#f87171", isMonetary: false },
+              { label: "Entradas", value: `${entradas}`, color: "rgba(255,255,255,0.85)", isMonetary: false },
+              { label: "Saldo", value: `R$\u00A0${formatBrl(currentBalance)}`, color: "rgba(255,255,255,0.85)", isMonetary: true },
+            ].map((s) => (
+              <div key={s.label} style={{
+                background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)",
+                borderRadius: 10, padding: "7px 5px", textAlign: "center",
+              }}>
+                <div style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", fontWeight: 600, letterSpacing: 0.8, textTransform: "uppercase", marginBottom: 4 }}>
+                  {s.label}
+                </div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: s.color, fontVariantNumeric: "tabular-nums", fontFeatureSettings: '"tnum"', lineHeight: 1 }}>
+                  {s.isMonetary && hideValues ? mask : s.value}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Lucro da sessão — por último */}
+          <div style={{
+            background: totalProfit > 0
+              ? "rgba(34,197,94,0.07)"
+              : totalProfit < 0
+              ? "rgba(239,68,68,0.07)"
+              : "rgba(255,255,255,0.04)",
+            border: `1px solid ${totalProfit > 0 ? "rgba(34,197,94,0.2)" : totalProfit < 0 ? "rgba(239,68,68,0.2)" : "rgba(255,255,255,0.08)"}`,
+            borderRadius: 12, padding: "10px 14px", marginBottom: 6, textAlign: "center",
+          }}>
+            <div style={{ fontSize: 10, color: "rgba(255,255,255,0.45)", fontWeight: 600, letterSpacing: 1.2, textTransform: "uppercase", marginBottom: 4 }}>
+              Lucro da sessão
+            </div>
+            <div style={{
+              fontSize: 28, fontWeight: 800, color: profitColor,
+              letterSpacing: -1, lineHeight: 1,
+              fontVariantNumeric: "tabular-nums", fontFeatureSettings: '"tnum"',
+            }}>
+              {hideValues ? mask : `${profitSign}R$ ${formatBrl(totalProfit)}`}
+            </div>
+          </div>
+
+          {/* Última entrada — junto com lucro da sessão */}
           {lastOp && lastOp.result !== "pending" && (
             <div style={{
               display: "flex", alignItems: "center", justifyContent: "space-between",
@@ -315,10 +298,9 @@ function WidgetContent({
                 <span style={{
                   fontSize: 12, fontWeight: 800,
                   color: lastOp.result === "win" ? "#4ade80" : "#f87171",
-                  fontVariantNumeric: "tabular-nums",
-                  fontFeatureSettings: '"tnum"',
+                  fontVariantNumeric: "tabular-nums", fontFeatureSettings: '"tnum"',
                 }}>
-                  {lastOp.profit >= 0 ? "+" : ""}R${formatBrl(lastOp.profit)}
+                  {hideValues ? mask : `${lastOp.profit >= 0 ? "+" : ""}R$${formatBrl(lastOp.profit)}`}
                 </span>
                 <span style={{
                   fontSize: 9, fontWeight: 800, padding: "2px 6px", borderRadius: 6, letterSpacing: 0.5,
@@ -377,6 +359,7 @@ export function BotLiveWidget({ onClose }: Props) {
   const lastOp = operations[operations.length - 1];
   const [flashResult, setFlashResult] = useState<"win" | "loss" | null>(null);
   const prevOpId = useRef<string | null>(null);
+  const [hideValues, setHideValues] = useState(false);
 
   useEffect(() => {
     if (!lastOp || lastOp.result === "pending" || lastOp.id === prevOpId.current) return;
@@ -415,24 +398,20 @@ export function BotLiveWidget({ onClose }: Props) {
     return () => { window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp); };
   }, []);
 
-  // Document Picture-in-Picture
+  // Document Picture-in-Picture — abre direto ao montar
   const [pipContainer, setPipContainer] = useState<Element | null>(null);
+  const pipOpenedRef = useRef(false);
 
   const openPiP = useCallback(async () => {
     const api = (window as any).documentPictureInPicture;
-    if (!api) {
-      alert("Picture-in-Picture não suportado. Use Chrome 116+.");
-      return;
-    }
+    if (!api) return;
     try {
       const pipWin: Window = await api.requestWindow({ width: 320, height: 520 });
 
-      // Copia todos os <style> e <link rel=stylesheet> da página
       [...document.querySelectorAll("style, link[rel='stylesheet']")].forEach((el) => {
         pipWin.document.head.appendChild(el.cloneNode(true));
       });
 
-      // Injeta keyframes de animação
       const animStyle = pipWin.document.createElement("style");
       animStyle.textContent = `
         * { box-sizing: border-box; }
@@ -448,23 +427,32 @@ export function BotLiveWidget({ onClose }: Props) {
       pipWin.document.body.appendChild(container);
       setPipContainer(container);
 
-      // Não fecha automaticamente — usuário fecha quando quiser
       pipWin.addEventListener("pagehide", () => setPipContainer(null));
-    } catch (err) {
-      console.error("PiP error:", err);
+    } catch {
+      // PiP não suportado ou cancelado — mostra widget flutuante normal
     }
   }, []);
 
-  const sharedProps = { operations, totalProfit, currentBalance, isRunning, stopReason, flashResult };
+  // Tenta abrir PiP automaticamente ao montar (uma única vez)
+  useEffect(() => {
+    if (pipOpenedRef.current) return;
+    pipOpenedRef.current = true;
+    openPiP();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const sharedProps = { operations, totalProfit, currentBalance, isRunning, stopReason, flashResult, hideValues, onToggleHide: () => setHideValues((v) => !v) };
 
   return (
     <>
-      {/* Widget flutuante na página */}
-      <div style={{ position: "fixed", left: pos.left, top: pos.top, zIndex: 9999 }}>
-        <WidgetContent {...sharedProps} onMouseDown={onMouseDown} onPiP={openPiP} onClose={onClose} />
-      </div>
+      {/* Widget flutuante na página — visível apenas se PiP não estiver aberto */}
+      {!pipContainer && (
+        <div style={{ position: "fixed", left: pos.left, top: pos.top, zIndex: 9999 }}>
+          <WidgetContent {...sharedProps} onMouseDown={onMouseDown} onPiP={openPiP} onClose={onClose} />
+        </div>
+      )}
 
-      {/* Portal para a janela PiP — persiste mesmo com stop gain/loss */}
+      {/* Portal para a janela PiP */}
       {pipContainer && createPortal(
         <WidgetContent {...sharedProps} inPip />,
         pipContainer,
