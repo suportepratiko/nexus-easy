@@ -1552,9 +1552,9 @@ def _run_bot(token: str, s, config: dict) -> None:
                         if (target_min_start - cur_ts) <= 1:
                             break
                         time.sleep(0.05)
-                    # Pequena pausa para a API/corretora finalizar a vela fechada (evita revalidação falsa falha)
+                    # Pausa mínima para a API/corretora registrar o fechamento da vela antes da revalidação
                     if state.get("running") and must_wait:
-                        time.sleep(2)
+                        time.sleep(0.3)
                 
                 # Revalidação (apenas quando wait_next_candle): vela de sinal já FECHOU — se não bater mais, aborta
                 # AGORA APLICA PARA TODAS AS ESTRATÉGIAS (built-in E customizadas)
@@ -1565,10 +1565,10 @@ def _run_bot(token: str, s, config: dict) -> None:
                         active, direction, current_strategy, current_candle_from,
                         get_candles_fn, get_ts_fn, custom_strategies_map
                     )
-                    # Se falhou por dados atrasados (API), dá uma segunda chance após 2s
+                    # Se falhou por dados atrasados (API), dá uma segunda chance após 700ms
                     if not guard_ok and state.get("running"):
-                        logging.info("bot_runner (Lider): revalidação falhou — nova tentativa em 2s (dados da vela podem estar atrasados)")
-                        time.sleep(2)
+                        logging.info("bot_runner (Lider): revalidação falhou — nova tentativa em 700ms (dados da vela podem estar atrasados)")
+                        time.sleep(0.7)
                         guard_ok = _revalidate_signal_on_closed(
                             active, direction, current_strategy, current_candle_from,
                             get_candles_fn, get_ts_fn, custom_strategies_map
