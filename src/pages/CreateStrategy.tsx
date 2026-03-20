@@ -870,7 +870,7 @@ function RuleEditor({
             <SelectContent className="max-h-[70vh]">
               <SelectGroup>
                 <SelectLabel className="text-xs font-bold text-muted-foreground uppercase tracking-wider px-2 py-1.5">
-                  🕯️ Velas
+                  Velas
                 </SelectLabel>
                 {(["candle_body", "consecutive", "wick_size", "breakout", "candle_compare", "engulfment", "candle_color"] as RuleType[]).map((t) => (
                   <SelectItem key={t} value={t} className="py-2.5">
@@ -880,7 +880,7 @@ function RuleEditor({
               </SelectGroup>
               <SelectGroup>
                 <SelectLabel className="text-xs font-bold text-muted-foreground uppercase tracking-wider px-2 py-1.5 mt-1">
-                  📊 Indicadores
+                  Indicadores
                 </SelectLabel>
                 {(["rsi", "bollinger", "ema_cross", "sma_cross", "macd", "ma_compare"] as RuleType[]).map((t) => (
                   <SelectItem key={t} value={t} className="py-2.5">
