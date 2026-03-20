@@ -148,6 +148,19 @@ class PushSubscription(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
+class ExtraLink(Base):
+    """Links extras da sidebar do usuário (Sala Premium, Indicador, etc.)."""
+    __tablename__ = "extra_links"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
+    key = Column(String(64), nullable=False, unique=True)   # sala_premium | indicador
+    label = Column(String(100), nullable=False)             # Nome exibido na sidebar
+    url = Column(String(2000), nullable=False, server_default=text("''"))
+    is_active = Column(Boolean, nullable=False, server_default=text("true"))
+    sort_order = Column(Integer, nullable=False, server_default=text("0"))
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
 class PwaMessageTemplate(Base):
     """Templates de mensagem para gatilhos automáticos (abertura, fechamento, stop)."""
     __tablename__ = "pwa_message_templates"
@@ -344,6 +357,17 @@ def init_db() -> None:
                 status VARCHAR(20) NOT NULL,
                 error VARCHAR(500),
                 created_at TIMESTAMPTZ DEFAULT now()
+            )
+        """))
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS extra_links (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                key VARCHAR(64) NOT NULL UNIQUE,
+                label VARCHAR(100) NOT NULL,
+                url VARCHAR(2000) NOT NULL DEFAULT '',
+                is_active BOOLEAN NOT NULL DEFAULT true,
+                sort_order INTEGER NOT NULL DEFAULT 0,
+                updated_at TIMESTAMPTZ DEFAULT now()
             )
         """))
 

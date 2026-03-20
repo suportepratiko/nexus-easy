@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
-import { TrendingUp, Settings, Link2, User, Headphones, Shield, Users, Webhook, Package, Trophy, Sparkles, FileText, Bell, Wrench, Mail } from "lucide-react";
+import { TrendingUp, Settings, Link2, User, Headphones, Shield, Users, Webhook, Package, Trophy, Sparkles, FileText, Bell, Wrench, Mail, ExternalLink, Crown, BarChart2 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useBot } from "@/modules/bot/BotProvider";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePlatformAuth } from "@/contexts/PlatformAuthContext";
 import { formatBrl } from "@/lib/utils";
-import { getBalances } from "@/lib/api";
+import { getBalances, getPlatformToken } from "@/lib/api";
 import {
   Sidebar,
   SidebarContent,
@@ -36,7 +36,13 @@ const adminNavItems = [
   { title: "Webhooks", url: "/admin/webhooks", icon: Webhook },
   { title: "Notificações PWA", url: "/admin/notificacoes-pwa", icon: Bell },
   { title: "Email Marketing", url: "/admin/email", icon: Mail },
+  { title: "Links Extras", url: "/admin/links", icon: Link2 },
 ];
+
+const EXTRA_LINK_ICONS: Record<string, React.ElementType> = {
+  sala_premium: Crown,
+  indicador: BarChart2,
+};
 
 export function AppSidebar() {
   const { state } = useSidebar();
@@ -69,6 +75,18 @@ export function AppSidebar() {
       })
       .catch(() => setSidebarBalance(null));
   }, [isAdminRoute, isSafirionConnected, isRunning]);
+
+  const [extraLinks, setExtraLinks] = useState<{ key: string; label: string; url: string }[]>([]);
+
+  useEffect(() => {
+    if (isAdminRoute) return;
+    const token = getPlatformToken();
+    if (!token) return;
+    fetch("/api/platform/extra-links", { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => r.ok ? r.json() : [])
+      .then(setExtraLinks)
+      .catch(() => {});
+  }, [isAdminRoute]);
 
   const displayName = user?.email?.split("@")[0] || "Usuário";
   const saldoNum = isRunning ? currentBalance : (sidebarBalance ?? (isSafirionConnected ? 0 : null));
@@ -135,6 +153,41 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+        {!isAdminRoute && extraLinks.length > 0 && (
+          <SidebarGroup>
+            <SidebarGroupLabel className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground px-2 mb-1.5 flex items-center gap-1.5">
+              <ExternalLink className="h-3.5 w-3.5" />
+              {!collapsed && "Extras"}
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu className="space-y-0.5">
+                {extraLinks.map((item) => {
+                  const Icon = EXTRA_LINK_ICONS[item.key] ?? ExternalLink;
+                  return (
+                    <SidebarMenuItem key={item.key}>
+                      <SidebarMenuButton asChild>
+                        <a
+                          href={item.url || "#"}
+                          target={item.url ? "_blank" : undefined}
+                          rel="noopener noreferrer"
+                          className={`text-base rounded-lg py-5 hover:bg-primary/10 hover:text-primary hover:border-primary/20 border border-transparent transition-all duration-200 flex items-center ${collapsed ? "px-0 justify-center" : "px-4"}`}
+                        >
+                          <Icon className={`h-4 w-4 shrink-0 ${collapsed ? "" : "mr-3"}`} />
+                          {!collapsed && (
+                            <span className="flex-1 flex items-center justify-between gap-1">
+                              {item.label}
+                              <ExternalLink className="h-3 w-3 opacity-40" />
+                            </span>
+                          )}
+                        </a>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                })}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
         {user?.role === "admin" && (
           <SidebarGroup>
             <SidebarGroupLabel className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground px-2 mb-1.5 flex items-center gap-1.5">

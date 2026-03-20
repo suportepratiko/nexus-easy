@@ -64,6 +64,7 @@ from backend.database import (
     SmtpConfig,
     EmailTemplate,
     EmailLog,
+    ExtraLink,
     init_db,
 )
 from backend.broker_sessions import BrokerSessionsManager
@@ -3258,3 +3259,63 @@ def admin_email_logs(
 def admin_email_logs_clear(db: Session = Depends(get_db), _admin: User = Depends(get_current_admin)):
     db.query(EmailLog).delete()
     db.commit()
+
+
+# ---------- Extra Links (Sala Premium, Indicador) ----------
+
+DEFAULT_EXTRA_LINKS = [
+    {"key": "sala_premium", "label": "Sala Premium", "sort_order": 0},
+    {"key": "indicador",    "label": "Indicador",    "sort_order": 1},
+]
+
+def _ensure_extra_links(db: Session) -> None:
+    for item in DEFAULT_EXTRA_LINKS:
+        exists = db.query(ExtraLink).filter(ExtraLink.key == item["key"]).first()
+        if not exists:
+            db.add(ExtraLink(key=item["key"], label=item["label"], url="", sort_order=item["sort_order"]))
+    db.commit()
+
+
+@app.get("/api/platform/extra-links")
+def get_extra_links(db: Session = Depends(get_db), _user: User = Depends(get_current_user)):
+    """Retorna links extras ativos para exibir na sidebar do usuário."""
+    _ensure_extra_links(db)
+    rows = db.query(ExtraLink).filter(ExtraLink.is_active == True).order_by(ExtraLink.sort_order).all()
+    return [{"key": r.key, "label": r.label, "url": r.url} for r in rows]
+
+
+@app.get("/api/platform/admin/extra-links")
+def admin_get_extra_links(db: Session = Depends(get_db), _admin: User = Depends(get_current_admin)):
+    _ensure_extra_links(db)
+    rows = db.query(ExtraLink).order_by(ExtraLink.sort_order).all()
+    return [
+        {"key": r.key, "label": r.label, "url": r.url, "is_active": r.is_active, "sort_order": r.sort_order}
+        for r in rows
+    ]
+
+
+class ExtraLinkUpdate(BaseModel):
+    label: str | None = None
+    url: str | None = None
+    is_active: bool | None = None
+
+
+@app.patch("/api/platform/admin/extra-links/{key}")
+def admin_update_extra_link(
+    key: str,
+    body: ExtraLinkUpdate,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(get_current_admin),
+):
+    _ensure_extra_links(db)
+    link = db.query(ExtraLink).filter(ExtraLink.key == key).first()
+    if not link:
+        raise HTTPException(status_code=404, detail="Link não encontrado.")
+    if body.label is not None:
+        link.label = body.label.strip()
+    if body.url is not None:
+        link.url = body.url.strip()
+    if body.is_active is not None:
+        link.is_active = body.is_active
+    db.commit()
+    return {"key": link.key, "label": link.label, "url": link.url, "is_active": link.is_active}

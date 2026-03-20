@@ -21,6 +21,7 @@ import UserRankingPage from "./pages/admin/UserRanking";
 import AdminGeminiPromptPage from "./pages/admin/AdminGeminiPrompt";
 import AdminPwaNotificationsPage from "./pages/admin/AdminPwaNotifications";
 import AdminEmailPage from "./pages/admin/AdminEmail";
+import AdminLinksPage from "./pages/admin/AdminLinks";
 import NotificationsPage from "./pages/Notifications";
 import RankingPage from "./pages/Ranking";
 import MyProfilePage from "./pages/MyProfile";
@@ -73,6 +74,7 @@ const App = () => (
                             <Route path="/admin/gemini-prompt" element={<AdminRoute><AdminGeminiPromptPage /></AdminRoute>} />
                             <Route path="/admin/notificacoes-pwa" element={<AdminRoute><AdminPwaNotificationsPage /></AdminRoute>} />
                             <Route path="/admin/email" element={<AdminRoute><AdminEmailPage /></AdminRoute>} />
+                            <Route path="/admin/links" element={<AdminRoute><AdminLinksPage /></AdminRoute>} />
                             <Route path="/admin" element={<AdminRoute><Navigate to="/admin/usuarios" replace /></AdminRoute>} />
                             <Route path="*" element={<NotFound />} />
                           </Routes>
