@@ -164,6 +164,8 @@ export function useBotState() {
       startingUntilRef.current = Date.now() + 8000;
       setError(null);
       setStopReason(null);
+      const accountMode = strategyConfig.accountMode ?? "REAL";
+      console.log("[BotProvider] startBot chamado | accountMode =", accountMode, "| config completo =", strategyConfig);
       const payload = {
         entryValue: strategyConfig.entryValue,
         payout: strategyConfig.payout,
@@ -181,7 +183,9 @@ export function useBotState() {
             typeof s.id === "string" && typeof s.name === "string" && typeof s.code === "string" && typeof s.timeframe === "string"
         ),
         waitNextCandle: strategyConfig.waitNextCandle ?? true,
+        accountMode,
       };
+      console.log("[BotProvider] payload enviado ao backend =", payload);
       apiStartBot(payload)
         .then(() => {
           setConfig(strategyConfig);

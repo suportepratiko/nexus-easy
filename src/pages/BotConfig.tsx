@@ -165,9 +165,11 @@ export default function BotConfigPage() {
     getPlatformBotConfig()
       .then((res) => {
         if (cancelled || !res?.config) return;
+        console.log("[BotConfig] config carregada do backend =", res.config);
         const parsed = StrategyConfigSchema.safeParse(res.config);
-        if (!parsed.success) return;
+        if (!parsed.success) { console.warn("[BotConfig] parse falhou:", parsed.error); return; }
         const cfg = parsed.data;
+        console.log("[BotConfig] config após parse Zod | accountMode =", cfg.accountMode);
         setBankroll(String(cfg.bankroll));
         setEntryValue(String(cfg.entryValue));
         setPayout(String(cfg.payout));
@@ -232,7 +234,9 @@ export default function BotConfigPage() {
   };
 
   const handleStart = () => {
+    console.log("[BotConfig] handleStart | accountMode state =", accountMode);
     const cfg = buildConfig();
+    console.log("[BotConfig] buildConfig result | accountMode =", cfg?.accountMode, "| cfg =", cfg);
     if (!cfg) return;
     const activeBalance = accountMode === "PRACTICE" ? demoBalance : realBalance;
     if (activeBalance !== null && activeBalance > 0) {

@@ -1375,6 +1375,7 @@ def bot_start(body: BotConfigBody, request: Request):
     if not token:
         raise HTTPException(status_code=401, detail="Token Safirion ausente. Conecte na corretora.")
     config = body.model_dump()
+    logging.info("bot_start: payload recebido do frontend | accountMode='%s' | config=%s", config.get("accountMode"), config)
     email = _broker_sessions.get_email(token)
     if email:
         config["session_email"] = email
