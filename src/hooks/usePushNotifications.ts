@@ -3,54 +3,65 @@ import { getPushVapidPublic, savePushSubscription } from "@/lib/api/pwa";
 
 export type PushStatus = "unsupported" | "prompt" | "granted" | "denied" | "subscribed" | "error";
 
-/** Espera um registration ficar ativo (installing/waiting → activated). */
-function waitForActive(reg: ServiceWorkerRegistration): Promise<ServiceWorkerRegistration> {
+/** Aguarda SW ativo; resolve com timeout de segurança. */
+function waitForActive(reg: ServiceWorkerRegistration, timeoutMs = 6000): Promise<ServiceWorkerRegistration> {
   if (reg.active) return Promise.resolve(reg);
   return new Promise<ServiceWorkerRegistration>((resolve) => {
     const sw = reg.installing || reg.waiting;
-    if (!sw) { resolve(reg); return; }
-    sw.addEventListener("statechange", () => {
-      if (sw.state === "activated") resolve(reg);
-    });
-    setTimeout(() => resolve(reg), 5000);
+    if (!sw) { setTimeout(() => resolve(reg), 500); return; }
+    const onStateChange = () => {
+      if (sw.state === "activated" || sw.state === "active" as ServiceWorkerState) {
+        sw.removeEventListener("statechange", onStateChange);
+        resolve(reg);
+      }
+    };
+    sw.addEventListener("statechange", onStateChange);
+    setTimeout(() => resolve(reg), timeoutMs);
   });
 }
 
-/** Garante que o SW está registrado e ativo. Tenta múltiplas estratégias. */
+/**
+ * Garante que existe um SW ativo para usar o PushManager.
+ *
+ * Estratégia:
+ * 1) navigator.serviceWorker.ready — em PWA instalado resolve imediatamente.
+ *    Timeout de 4s para não travar num browser sem SW.
+ * 2) getRegistrations() — pega qualquer SW já registrado na origem.
+ * 3) Registro manual de /sw.js como último recurso.
+ */
 async function ensureServiceWorker(): Promise<ServiceWorkerRegistration | null> {
   if (!("serviceWorker" in navigator)) return null;
 
-  // 1) Se já existe registration ativo, usa ele
-  const existing = await navigator.serviceWorker.getRegistration("/");
-  if (existing?.active) return existing;
-  if (existing) return waitForActive(existing);
+  // 1) serviceWorker.ready — mais confiável em PWA instalado (SW já ativo)
+  try {
+    const ready = await Promise.race([
+      navigator.serviceWorker.ready,
+      new Promise<null>((r) => setTimeout(() => r(null), 4000)),
+    ]) as ServiceWorkerRegistration | null;
+    if (ready?.active) return ready;
+  } catch (err) {
+    console.warn("[push] serviceWorker.ready:", err);
+  }
 
-  // 2) Espera um pouco — o vite-plugin-pwa auto-register pode estar rodando
-  await new Promise((r) => setTimeout(r, 1500));
-  const delayed = await navigator.serviceWorker.getRegistration("/");
-  if (delayed?.active) return delayed;
-  if (delayed) return waitForActive(delayed);
+  // 2) Busca qualquer registration ativa na origem (funciona quando .ready falha)
+  try {
+    const regs = await navigator.serviceWorker.getRegistrations();
+    const active = regs.find((r) => r.active);
+    if (active) return active;
+    // Ainda há registrations em ativação — espera a primeira
+    if (regs.length > 0) return waitForActive(regs[0]);
+  } catch (err) {
+    console.warn("[push] getRegistrations:", err);
+  }
 
-  // 3) Tenta registrar manualmente
+  // 3) Sem SW algum — registra manualmente
   try {
     const reg = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
     return waitForActive(reg);
   } catch (err) {
-    console.error("[push] SW register falhou:", err);
+    console.error("[push] register falhou:", err);
+    return null;
   }
-
-  // 4) Último recurso: navigator.serviceWorker.ready (espera qualquer SW ativar)
-  try {
-    const ready = await Promise.race([
-      navigator.serviceWorker.ready,
-      new Promise<null>((r) => setTimeout(() => r(null), 8000)),
-    ]);
-    if (ready) return ready;
-  } catch (err) {
-    console.error("[push] SW ready falhou:", err);
-  }
-
-  return null;
 }
 
 export function usePushNotifications() {
@@ -105,8 +116,12 @@ export function usePushNotifications() {
       return;
     }
     const reg = await ensureServiceWorker();
-    if (!reg) {
-      const msg = "Falha ao registrar service worker.";
+    if (!reg || !reg.pushManager) {
+      // iOS < 16.4 não suporta push mesmo com SW registrado
+      const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
+      const msg = isIos
+        ? "Notificações push requerem iOS 16.4+ e o app instalado via 'Adicionar à Tela de Início'."
+        : "Não foi possível iniciar o service worker. Tente recarregar o app.";
       setError(msg);
       setStatus("error");
       onError?.(msg);
