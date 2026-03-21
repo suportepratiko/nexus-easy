@@ -13,6 +13,13 @@ function isMobile(): boolean {
     (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 }
 
+/** iOS exige gesto do usuário para requestPermission — auto-trigger falha silenciosamente. */
+function isIos(): boolean {
+  if (typeof window === "undefined") return false;
+  return /iphone|ipad|ipod/i.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+}
+
 /** Exibido em mobile quando notificações ainda não foram ativadas. */
 export function PwaNotificationBanner() {
   const { status, enable } = usePushNotifications();
@@ -47,8 +54,9 @@ export function PwaNotificationBanner() {
     setVisible(true);
   }, [status, dismissed]);
 
-  // Auto-ativa quando: permissão ainda não pedida ("prompt") OU concedida mas sem subscription ("granted")
+  // Auto-ativa apenas no Android (iOS exige gesto real do usuário para requestPermission)
   useEffect(() => {
+    if (isIos()) return; // iOS: só via clique
     if (!visible || (status !== "prompt" && status !== "granted") || loading || autoPromptDone.current) return;
     autoPromptDone.current = true;
     const t = setTimeout(() => {
@@ -62,7 +70,7 @@ export function PwaNotificationBanner() {
         (msg) => {
           toast.error(msg);
           setLoading(false);
-          autoPromptDone.current = false; // permite tentar de novo pelo botão
+          autoPromptDone.current = false;
         }
       );
     }, 1000);

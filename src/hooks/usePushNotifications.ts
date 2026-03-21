@@ -116,12 +116,8 @@ export function usePushNotifications() {
       return;
     }
     const reg = await ensureServiceWorker();
-    if (!reg || !reg.pushManager) {
-      // iOS < 16.4 não suporta push mesmo com SW registrado
-      const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
-      const msg = isIos
-        ? "Notificações push requerem iOS 16.4+ e o app instalado via 'Adicionar à Tela de Início'."
-        : "Não foi possível iniciar o service worker. Tente recarregar o app.";
+    if (!reg) {
+      const msg = "Não foi possível iniciar o service worker. Tente fechar e reabrir o app.";
       setError(msg);
       setStatus("error");
       onError?.(msg);
@@ -131,24 +127,41 @@ export function usePushNotifications() {
       const result = await Notification.requestPermission();
       if (result !== "granted") {
         setStatus("denied");
-        const msg = "Permissão negada.";
+        const msg = "Permissão negada. Habilite nas configurações do dispositivo.";
         setError(msg);
         onError?.(msg);
         return;
       }
     }
     try {
-      // Sempre cancelar subscription antiga para forçar nova com a chave atual do backend (evita BadJwtToken)
-      const existing = await reg.pushManager.getSubscription();
+      // Sempre cancelar subscription antiga para forçar nova com a chave atual (evita BadJwtToken)
+      const pm = reg.pushManager;
+      if (!pm) throw new Error("PushManager não disponível. Abra o app pelo ícone na tela de início.");
+      const existing = await pm.getSubscription();
       if (existing) await existing.unsubscribe();
       const { publicKey } = await getPushVapidPublic();
       const key = urlB64ToUint8Array(publicKey.trim());
-      const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
+      const sub = await pm.subscribe({ userVisibleOnly: true, applicationServerKey: key });
       await savePushSubscription(sub, navigator.userAgent);
       setStatus("subscribed");
       onSuccess?.();
     } catch (e) {
-      const msg = e && typeof e === "object" && "detail" in e ? String((e as { detail: string }).detail) : "Push não configurado ou falha ao ativar.";
+      let msg = "Falha ao ativar notificações push.";
+      if (e && typeof e === "object") {
+        if ("detail" in e) {
+          msg = String((e as { detail: string }).detail);
+        } else if ("message" in e) {
+          const raw = String((e as { message: string }).message);
+          // Mensagem amigável para erros conhecidos
+          if (raw.toLowerCase().includes("pushmanager")) {
+            msg = "Abra o app pelo ícone na tela de início para ativar notificações.";
+          } else if (raw.toLowerCase().includes("permission")) {
+            msg = "Permissão negada. Habilite nas configurações do dispositivo.";
+          } else {
+            msg = raw;
+          }
+        }
+      }
       setError(msg);
       setStatus("error");
       onError?.(msg);
