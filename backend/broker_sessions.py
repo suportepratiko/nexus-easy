@@ -172,9 +172,28 @@ class BrokerSessionHandle:
 
 
 class BrokerSessionsManager:
+    _REAPER_INTERVAL = 30  # segundos entre cada varredura de sessões zumbi
+
     def __init__(self):
         self._sessions: dict[str, BrokerSessionHandle] = {}
         self._lock = threading.Lock()
+        # Thread de limpeza automática de sessões mortas
+        self._reaper = threading.Thread(target=self._reap_dead_sessions, daemon=True)
+        self._reaper.start()
+
+    def _reap_dead_sessions(self) -> None:
+        """Remove sessões cujo subprocess morreu inesperadamente."""
+        import time as _time
+        while True:
+            _time.sleep(self._REAPER_INTERVAL)
+            try:
+                with self._lock:
+                    dead = [t for t, h in self._sessions.items() if not h.process.is_alive()]
+                for token in dead:
+                    logging.warning("broker_sessions: sessão zumbi detectada token=%s*** — removendo", token[:6])
+                    self.close_session(token)
+            except Exception as e:
+                logging.error("broker_sessions: erro no reaper: %s", e)
 
     def get_session_by_email(self, email: str) -> str | None:
         """Retorna o token de uma sessão ativa para o email, se existir."""

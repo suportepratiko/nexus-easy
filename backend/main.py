@@ -138,34 +138,53 @@ def _decrypt_password(stored: str) -> str:
 # ---------- WebSocket Management ----------
 
 class ConnectionManager:
+    _MAX_CONNECTIONS_PER_TOKEN = 10  # limite de conexões simultâneas por token
+
     def __init__(self):
         # Mapeia token_corretora -> lista de websocket ativos
         self.active_connections: Dict[str, List[WebSocket]] = {}
+        self._lock = asyncio.Lock()
 
     async def connect(self, websocket: WebSocket, token: str):
         await websocket.accept()
-        if token not in self.active_connections:
-            self.active_connections[token] = []
-        self.active_connections[token].append(websocket)
+        async with self._lock:
+            if token not in self.active_connections:
+                self.active_connections[token] = []
+            conns = self.active_connections[token]
+            # Remove conexões mortas e limita total por token
+            if len(conns) >= self._MAX_CONNECTIONS_PER_TOKEN:
+                oldest = conns.pop(0)
+                try:
+                    await oldest.close()
+                except Exception:
+                    pass
+            conns.append(websocket)
 
-    def disconnect(self, websocket: WebSocket, token: str):
-        if token in self.active_connections:
-            if websocket in self.active_connections[token]:
-                self.active_connections[token].remove(websocket)
-            if not self.active_connections[token]:
-                del self.active_connections[token]
+    async def disconnect(self, websocket: WebSocket, token: str):
+        async with self._lock:
+            if token in self.active_connections:
+                if websocket in self.active_connections[token]:
+                    self.active_connections[token].remove(websocket)
+                if not self.active_connections[token]:
+                    del self.active_connections[token]
 
     async def broadcast(self, token: str, data: Any):
-        if token in self.active_connections:
-            # Enviar para todos os dispositivos logados no mesmo token
-            disconnected = []
-            for connection in self.active_connections[token]:
-                try:
-                    await connection.send_json(data)
-                except Exception:
-                    disconnected.append(connection)
-            for conn in disconnected:
-                self.disconnect(conn, token)
+        async with self._lock:
+            conns = list(self.active_connections.get(token, []))
+        # Enviar fora do lock para não bloquear outros
+        disconnected = []
+        for connection in conns:
+            try:
+                await connection.send_json(data)
+            except Exception:
+                disconnected.append(connection)
+        if disconnected:
+            async with self._lock:
+                for conn in disconnected:
+                    if token in self.active_connections and conn in self.active_connections[token]:
+                        self.active_connections[token].remove(conn)
+                    if token in self.active_connections and not self.active_connections[token]:
+                        del self.active_connections[token]
 
 manager = ConnectionManager()
 
@@ -1480,7 +1499,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str = None):
     except Exception as e:
         logging.warning("WebSocket: erro inesperado no token %s: %s", token[:8], e)
     finally:
-        manager.disconnect(websocket, token)
+        await manager.disconnect(websocket, token)
 
 
 # ---------- Webhooks de pagamento / assinatura ----------
@@ -2666,7 +2685,9 @@ class PublicRankingResponse(BaseModel):
 
 
 @app.get("/api/platform/ranking", response_model=PublicRankingResponse)
+@limiter.limit("30/minute")
 def get_public_ranking(
+    request: Request,
     preset: str = "current_month",
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -2887,6 +2908,7 @@ def admin_pwa_send_custom(
 ):
     """Envia mensagem personalizada para todos os usuários que têm PWA com notificações ativas."""
     from backend.push_service import send_push_subscription
+    from concurrent.futures import ThreadPoolExecutor
     import json
     title = (body.title or "").strip() or "Nexus Bot"
     body_text = (body.body or "").strip()
@@ -2895,10 +2917,18 @@ def admin_pwa_send_custom(
         url = "/" + url
     subs = db.query(PushSubscription).all()
     payload = json.dumps({"title": title, "body": body_text, "data": {"url": url}, "tag": "nexus-custom"})
-    sent = 0
-    for sub in subs:
-        if send_push_subscription(sub.endpoint, sub.p256dh, sub.auth, payload):
-            sent += 1
+
+    # Envia em paralelo com thread pool (não bloqueia o servidor)
+    def _send(sub):
+        try:
+            return send_push_subscription(sub.endpoint, sub.p256dh, sub.auth, payload)
+        except Exception:
+            return False
+
+    with ThreadPoolExecutor(max_workers=min(20, len(subs) or 1)) as pool:
+        results = list(pool.map(_send, subs))
+    sent = sum(1 for r in results if r)
+
     rec = PwaCustomMessage(title=title, body=body_text, url=url if url != "/" else None, sent_count=sent)
     db.add(rec)
     db.commit()

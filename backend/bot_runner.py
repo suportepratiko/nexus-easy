@@ -70,6 +70,9 @@ _bot_lock = threading.Lock()
 # Um ciclo de compra por vez por token (evita duas entradas simultâneas)
 _trade_locks: dict[str, threading.Lock] = {}
 _trade_locks_lock = threading.Lock()
+
+# Limite de operações mantidas na RAM por sessão (evita memory leak em sessões longas)
+_MAX_OPS_IN_MEMORY = 500
 _signal_bus_lock = threading.Lock()
 _signal_bus_engine = None
 
@@ -81,6 +84,19 @@ def _check_target(value: float, ops: int, mode: str, target: float, banca: float
         # Porcentagem em relação à banca do usuário (saldo ao iniciar a sessão)
         return banca and (value / banca) * 100 >= target
     return False
+
+
+def _interruptible_sleep(seconds: float, state: dict, check_interval: float = 0.5) -> bool:
+    """Dorme por `seconds` mas verifica state['running'] a cada `check_interval`.
+    Retorna True se dormiu completamente, False se interrompido (bot parou)."""
+    elapsed = 0.0
+    while elapsed < seconds:
+        chunk = min(check_interval, seconds - elapsed)
+        time.sleep(chunk)
+        elapsed += chunk
+        if not state.get("running"):
+            return False
+    return True
 
 
 def _martingale_max(level: str) -> int:
@@ -1798,7 +1814,8 @@ def _run_bot(token: str, s, config: dict) -> None:
                     if _digital_key_error:
                         _consecutive_errors = 0
 
-                    time.sleep(5)
+                    if not _interruptible_sleep(5, state):
+                        break
                     continue
 
                 # Registra operação como PENDENTE na hora (aparece na plataforma de imediato).
@@ -1816,6 +1833,9 @@ def _run_bot(token: str, s, config: dict) -> None:
                     "strategy": current_strategy,
                     "duration": current_duration,
                 })
+                # Limita operações na RAM para evitar memory leak em sessões longas
+                if len(operations) > _MAX_OPS_IN_MEMORY:
+                    operations[:] = operations[-_MAX_OPS_IN_MEMORY:]
                 direction_label = "Compra" if direction == "call" else "Venda"
                 _trigger_push_event(session_email, "operation_opened", {
                     "asset": used_active,
@@ -1919,11 +1939,13 @@ def _run_bot(token: str, s, config: dict) -> None:
                     remaining = needed_total - elapsed
                     if remaining > 0:
                         logging.info("bot_runner: aguardando fechamento da vela (faltam %.1fs)...", remaining)
-                        time.sleep(remaining)
+                        if not _interruptible_sleep(remaining, state):
+                            break
                     else:
                         # Se já passamos do tempo necessário (ex: por timeout do poll anterior),
                         # fazemos apenas uma pequena pausa técnica para a corretora processar o saldo
-                        time.sleep(2)
+                        if not _interruptible_sleep(2, state):
+                            break
                     
                     # Antes de verificar saldo, tenta mais uma vez verificar resultado direto (para binárias)
                     if used_type != "digital" and order_id is not None:
@@ -1970,7 +1992,8 @@ def _run_bot(token: str, s, config: dict) -> None:
                                 BALANCE_RETRY_WAIT_SEC,
                                 retry + 1,
                             )
-                            time.sleep(BALANCE_RETRY_WAIT_SEC)
+                            if not _interruptible_sleep(BALANCE_RETRY_WAIT_SEC, state):
+                                break
                         if used_type == "digital" and abs(profit) < MIN_PROFIT_FOR_WIN:
                             is_win = None
                             logging.info(
@@ -2177,7 +2200,8 @@ def _run_bot(token: str, s, config: dict) -> None:
                 state["running"] = False
                 state["error"] = f"Muitos erros consecutivos: {e}"
                 break
-            time.sleep(5)
+            if not _interruptible_sleep(5, state):
+                break
             continue
         else:
             # Iteração sem exceção: reset do contador
@@ -2238,6 +2262,9 @@ def reset_bot(token: str) -> None:
             _bot_state[token]["operations"] = []
             _bot_state[token]["total_profit"] = 0
             _bot_state[token]["error"] = None
+    # Limpa trade lock para liberar memória
+    with _trade_locks_lock:
+        _trade_locks.pop(token, None)
 
 
 def get_bot_state(token: str) -> dict[str, Any] | None:

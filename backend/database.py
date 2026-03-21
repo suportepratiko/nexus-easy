@@ -80,7 +80,7 @@ class WebhookPayload(Base):
     method = Column(String(16), nullable=False)
     ip_address = Column(String(64), nullable=True)
     user_agent = Column(String(255), nullable=True)
-    processed = Column(Boolean, nullable=False, server_default=text("false"))
+    processed = Column(Boolean, nullable=False, server_default=text("false"), index=True)
     processed_at = Column(DateTime(timezone=True), nullable=True)
     error = Column(String(512), nullable=True)
     process_details = Column(JSONB, nullable=True)
@@ -277,7 +277,14 @@ def get_engine():
         logging.warning("[database] DATABASE_URL com esquema `postgres://`. Convertendo para `postgresql://`.")
         url = url.replace("postgres://", "postgresql://", 1)
 
-    return create_engine(url, pool_pre_ping=True)
+    return create_engine(
+        url,
+        pool_pre_ping=True,
+        pool_size=20,           # conexões permanentes (suficiente para 100+ users)
+        max_overflow=30,        # conexões extras sob carga (total máx = 50)
+        pool_timeout=30,        # segundos esperando conexão livre
+        pool_recycle=1800,      # recicla conexões a cada 30min (evita stale)
+    )
 
 
 def get_session_factory():
@@ -373,4 +380,11 @@ def init_db() -> None:
             )
         """))
         conn.execute(text("ALTER TABLE extra_links ADD COLUMN IF NOT EXISTS icon VARCHAR(64) NOT NULL DEFAULT 'Link'"))
+
+        # ── Indexes para performance com muitos usuários ──
+        conn.execute(text("CREATE INDEX IF NOT EXISTS idx_user_ops_timestamp ON user_operations (\"timestamp\" DESC)"))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS idx_user_ops_email_ts ON user_operations (user_email, \"timestamp\" DESC)"))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS idx_webhook_payloads_processed ON webhook_payloads (processed)"))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS idx_email_logs_created ON email_logs (created_at DESC)"))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS idx_users_plan_expires ON users (plan_expires_at)"))
 
