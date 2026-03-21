@@ -20,11 +20,58 @@
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Nexus Bot" />
     <meta name="twitter:image" content="/logos/favicon.png" />
+
+    <style>
+      #app-splash {
+        position: fixed; inset: 0; z-index: 99999;
+        background: #0a0a0a;
+        display: flex; align-items: center; justify-content: center;
+        transition: opacity 0.3s ease;
+      }
+      #app-splash img {
+        width: 72px; height: 72px;
+        border-radius: 16px;
+        animation: splash-pulse 1.5s ease-in-out infinite;
+      }
+      @keyframes splash-pulse {
+        0%, 100% { opacity: 0.7; transform: scale(1); }
+        50% { opacity: 1; transform: scale(1.05); }
+      }
+    </style>
   </head>
 
   <body>
     <script>document.documentElement.classList.add('dark');document.documentElement.classList.remove('light');</script>
+
+    <!-- Splash: aparece instantaneamente enquanto o React carrega -->
+    <div id="app-splash">
+      <img src="/logos/favicon.png" alt="" />
+    </div>
+
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <script>
+      (function() {
+        var splash = document.getElementById('app-splash');
+        if (!splash) return;
+        var root = document.getElementById('root');
+        // Remove assim que o React renderizar algo
+        var observer = new MutationObserver(function() {
+          if (root.children.length > 0) {
+            splash.style.opacity = '0';
+            setTimeout(function() { splash.remove(); }, 300);
+            observer.disconnect();
+          }
+        });
+        observer.observe(root, { childList: true });
+        // Fallback: remove após 4s no pior caso
+        setTimeout(function() {
+          if (splash.parentNode) {
+            splash.style.opacity = '0';
+            setTimeout(function() { if (splash.parentNode) splash.remove(); }, 300);
+          }
+        }, 4000);
+      })();
+    </script>
   </body>
 </html>
