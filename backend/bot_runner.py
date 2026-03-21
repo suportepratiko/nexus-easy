@@ -58,6 +58,8 @@ WAIT_AFTER_BUY_SECONDS_DIGITAL = 63
 BALANCE_RETRY_WAIT_SEC = 4
 # Lucro mínimo (R$) para considerar WIN; abaixo disso = LOSS (evita erro por arredondamento/atraso).
 MIN_PROFIT_FOR_WIN = 0.50
+# Ativos que não suportam nenhuma modalidade na corretora — nunca entrar.
+BLOCKED_ACTIVES = {"Yen_Index"}
 # Intervalo padrão para verificar se ainda há posição aberta na corretora.
 POLL_OPEN_POSITIONS_INTERVAL_SEC = 5
 # Em ciclo de martingale (mg_level > 0), usar polling mais curto para reentrada mais rápida.
@@ -1000,6 +1002,8 @@ def _run_bot(token: str, s, config: dict) -> None:
                     allow_otc=allow_otc,
                 )
                 if out:
+                    # Remove ativos bloqueados (não suportados pela corretora)
+                    out = [item for item in out if item.get("name") not in BLOCKED_ACTIVES]
                     # Garantir filtro rigoroso por Mercado (Aberto vs OTC) e Modalidade
                     if not allow_otc:
                          out = [item for item in out if not _is_active_otc(item.get("name"))]
