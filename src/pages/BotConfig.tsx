@@ -23,6 +23,8 @@ import {
   Hash,
   Sparkles,
   Search,
+  AlertTriangle,
+  CheckCircle2,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
@@ -358,24 +360,30 @@ export default function BotConfigPage() {
             {isBrokerConnected && (
               <div className="space-y-3">
                 {/* Seletor REAL / DEMO */}
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Conta de operação</p>
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
                     disabled={isRunning}
                     onClick={() => setAccountMode("REAL")}
-                    className={`rounded-lg border p-2.5 text-left transition-all ${
+                    className={`relative rounded-xl border-2 p-3 text-left transition-all duration-200 focus:outline-none ${
                       accountMode === "REAL"
-                        ? "border-emerald-500 bg-emerald-500/10"
-                        : "border-border bg-muted/30 hover:bg-muted/50"
+                        ? "border-emerald-500 bg-emerald-500/10 shadow-[0_0_12px_rgba(16,185,129,0.15)]"
+                        : "border-border bg-muted/20 hover:border-muted-foreground/40 hover:bg-muted/40"
                     }`}
                   >
-                    <p className={`text-[10px] font-semibold uppercase tracking-wider mb-0.5 ${accountMode === "REAL" ? "text-emerald-400" : "text-muted-foreground"}`}>
+                    {accountMode === "REAL" && (
+                      <span className="absolute top-2 right-2">
+                        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+                      </span>
+                    )}
+                    <p className={`text-[10px] font-bold uppercase tracking-widest mb-1.5 ${accountMode === "REAL" ? "text-emerald-400" : "text-muted-foreground"}`}>
                       Real
                     </p>
                     {balanceLoading ? (
-                      <p className="text-sm font-semibold tabular-nums">…</p>
+                      <p className="text-sm font-semibold tabular-nums text-muted-foreground">…</p>
                     ) : (
-                      <p className={`text-sm font-bold tabular-nums ${accountMode === "REAL" ? "text-foreground" : "text-muted-foreground"}`}>
+                      <p className={`text-sm font-bold tabular-nums leading-none ${accountMode === "REAL" ? "text-foreground" : "text-muted-foreground"}`}>
                         {realBalance !== null ? `R$ ${formatBrl(realBalance)}` : "—"}
                       </p>
                     )}
@@ -384,28 +392,36 @@ export default function BotConfigPage() {
                     type="button"
                     disabled={isRunning}
                     onClick={() => setAccountMode("PRACTICE")}
-                    className={`rounded-lg border p-2.5 text-left transition-all ${
+                    className={`relative rounded-xl border-2 p-3 text-left transition-all duration-200 focus:outline-none ${
                       accountMode === "PRACTICE"
-                        ? "border-yellow-500 bg-yellow-500/10"
-                        : "border-border bg-muted/30 hover:bg-muted/50"
+                        ? "border-yellow-500 bg-yellow-500/10 shadow-[0_0_12px_rgba(234,179,8,0.15)]"
+                        : "border-border bg-muted/20 hover:border-muted-foreground/40 hover:bg-muted/40"
                     }`}
                   >
-                    <p className={`text-[10px] font-semibold uppercase tracking-wider mb-0.5 ${accountMode === "PRACTICE" ? "text-yellow-400" : "text-muted-foreground"}`}>
+                    {accountMode === "PRACTICE" && (
+                      <span className="absolute top-2 right-2">
+                        <CheckCircle2 className="h-3.5 w-3.5 text-yellow-400" />
+                      </span>
+                    )}
+                    <p className={`text-[10px] font-bold uppercase tracking-widest mb-1.5 ${accountMode === "PRACTICE" ? "text-yellow-400" : "text-muted-foreground"}`}>
                       Demo
                     </p>
                     {balanceLoading ? (
-                      <p className="text-sm font-semibold tabular-nums">…</p>
+                      <p className="text-sm font-semibold tabular-nums text-muted-foreground">…</p>
                     ) : (
-                      <p className={`text-sm font-bold tabular-nums ${accountMode === "PRACTICE" ? "text-foreground" : "text-muted-foreground"}`}>
+                      <p className={`text-sm font-bold tabular-nums leading-none ${accountMode === "PRACTICE" ? "text-foreground" : "text-muted-foreground"}`}>
                         {demoBalance !== null ? `R$ ${formatBrl(demoBalance)}` : "—"}
                       </p>
                     )}
                   </button>
                 </div>
                 {accountMode === "PRACTICE" && (
-                  <p className="text-xs text-yellow-500/80 font-medium">
-                    ⚠️ Operando na conta demo. Sem dinheiro real.
-                  </p>
+                  <div className="flex items-center gap-2 rounded-lg border border-yellow-500/30 bg-yellow-500/8 px-3 py-2">
+                    <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-yellow-400" />
+                    <p className="text-xs text-yellow-400/90 font-medium">
+                      Conta demo — sem dinheiro real envolvido.
+                    </p>
+                  </div>
                 )}
               </div>
             )}
