@@ -38,7 +38,7 @@ def _normalize_balances(raw: Any) -> list[dict[str, Any]]:
 def _worker(session_token: str, login_email: str, password: str, conn: Connection):
     # Configurar logging dentro do processo filho, senão logging.info não aparece no terminal.
     logging.basicConfig(
-        level=logging.ERROR,
+        level=logging.INFO,
         format="%(asctime)s [%(levelname)s] subprocess(%(process)d): %(message)s",
     )
     s = None
