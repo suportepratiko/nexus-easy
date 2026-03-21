@@ -3,29 +3,54 @@ import { getPushVapidPublic, savePushSubscription } from "@/lib/api/pwa";
 
 export type PushStatus = "unsupported" | "prompt" | "granted" | "denied" | "subscribed" | "error";
 
-/** Garante que o SW está registrado e ativo. Registra se necessário. */
+/** Espera um registration ficar ativo (installing/waiting → activated). */
+function waitForActive(reg: ServiceWorkerRegistration): Promise<ServiceWorkerRegistration> {
+  if (reg.active) return Promise.resolve(reg);
+  return new Promise<ServiceWorkerRegistration>((resolve) => {
+    const sw = reg.installing || reg.waiting;
+    if (!sw) { resolve(reg); return; }
+    sw.addEventListener("statechange", () => {
+      if (sw.state === "activated") resolve(reg);
+    });
+    setTimeout(() => resolve(reg), 5000);
+  });
+}
+
+/** Garante que o SW está registrado e ativo. Tenta múltiplas estratégias. */
 async function ensureServiceWorker(): Promise<ServiceWorkerRegistration | null> {
   if (!("serviceWorker" in navigator)) return null;
-  // Se já existe um registration ativo, usa ele
+
+  // 1) Se já existe registration ativo, usa ele
   const existing = await navigator.serviceWorker.getRegistration("/");
   if (existing?.active) return existing;
-  // Caso contrário, registra (fallback — o vite-plugin-pwa também registra)
+  if (existing) return waitForActive(existing);
+
+  // 2) Espera um pouco — o vite-plugin-pwa auto-register pode estar rodando
+  await new Promise((r) => setTimeout(r, 1500));
+  const delayed = await navigator.serviceWorker.getRegistration("/");
+  if (delayed?.active) return delayed;
+  if (delayed) return waitForActive(delayed);
+
+  // 3) Tenta registrar manualmente
   try {
     const reg = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
-    // Espera ficar ativo (pode levar alguns ms na primeira vez)
-    if (reg.active) return reg;
-    return new Promise<ServiceWorkerRegistration>((resolve) => {
-      const sw = reg.installing || reg.waiting;
-      if (!sw) { resolve(reg); return; }
-      sw.addEventListener("statechange", () => {
-        if (sw.state === "activated") resolve(reg);
-      });
-      // Timeout de segurança
-      setTimeout(() => resolve(reg), 5000);
-    });
-  } catch {
-    return null;
+    return waitForActive(reg);
+  } catch (err) {
+    console.error("[push] SW register falhou:", err);
   }
+
+  // 4) Último recurso: navigator.serviceWorker.ready (espera qualquer SW ativar)
+  try {
+    const ready = await Promise.race([
+      navigator.serviceWorker.ready,
+      new Promise<null>((r) => setTimeout(() => r(null), 8000)),
+    ]);
+    if (ready) return ready;
+  } catch (err) {
+    console.error("[push] SW ready falhou:", err);
+  }
+
+  return null;
 }
 
 export function usePushNotifications() {

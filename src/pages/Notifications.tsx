@@ -3,8 +3,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { getNotificationPreferences, updateNotificationPreferences, type NotificationPreferenceItem } from "@/lib/api/notifications";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { toast } from "sonner";
-import { Loader2, MessageSquare, Smartphone } from "lucide-react";
+import { Loader2, MessageSquare, Smartphone, BellOff } from "lucide-react";
 import { NotificationsSkeleton } from "@/components/skeletons/PageSkeletons";
 
 /** Na UI do usuário, Stop Gain e Stop Loss aparecem como um único item. */
@@ -25,8 +26,12 @@ export default function NotificationsPage() {
   const [triggers, setTriggers] = useState<NotificationPreferenceItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingKey, setUpdatingKey] = useState<string | null>(null);
+  const [masterUpdating, setMasterUpdating] = useState(false);
+  const { status: pushStatus, enable: enablePush } = usePushNotifications();
 
   const displayRows = useMemo(() => buildDisplayRows(triggers), [triggers]);
+  const allEnabled = useMemo(() => triggers.length > 0 && triggers.every((t) => t.enabled), [triggers]);
+  const allDisabled = useMemo(() => triggers.length > 0 && triggers.every((t) => !t.enabled), [triggers]);
 
   const load = async () => {
     setLoading(true);
@@ -44,6 +49,36 @@ export default function NotificationsPage() {
   useEffect(() => {
     load();
   }, []);
+
+  const handleMasterToggle = async (enabled: boolean) => {
+    // Se vai ligar e push não está ativo, pede permissão primeiro
+    if (enabled && pushStatus !== "subscribed") {
+      setMasterUpdating(true);
+      const done = await new Promise<boolean>((resolve) => {
+        enablePush(() => resolve(true), (msg) => {
+          toast.error(msg);
+          resolve(false);
+        });
+      });
+      if (!done) {
+        setMasterUpdating(false);
+        return;
+      }
+    }
+    setMasterUpdating(true);
+    const next = triggers.map((t) => ({ ...t, enabled }));
+    setTriggers(next);
+    try {
+      const payload = next.reduce((acc, t) => ({ ...acc, [t.trigger_key]: t.enabled }), {} as Record<string, boolean>);
+      await updateNotificationPreferences(payload);
+      toast.success(enabled ? "Todas as notificações ativadas." : "Todas as notificações desativadas.");
+    } catch {
+      setTriggers(triggers);
+      toast.error("Falha ao salvar. Tente de novo.");
+    } finally {
+      setMasterUpdating(false);
+    }
+  };
 
   const handleToggle = async (triggerKey: string, enabled: boolean) => {
     const isStopGroup = triggerKey === "stop_gain";
@@ -78,6 +113,35 @@ export default function NotificationsPage() {
           Escolha quais notificações automáticas do PWA deseja receber no celular ou no navegador.
         </p>
       </div>
+
+      {/* Master toggle */}
+      <Card className="rounded-xl border border-border">
+        <CardContent className="flex items-center justify-between gap-4 p-4">
+          <div className="flex items-center gap-3 min-w-0">
+            {allDisabled || pushStatus === "denied" ? (
+              <BellOff className="h-5 w-5 shrink-0 text-muted-foreground" />
+            ) : (
+              <Smartphone className="h-5 w-5 shrink-0 text-primary" />
+            )}
+            <div className="min-w-0">
+              <p className="font-medium text-foreground">Notificações gerais</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {pushStatus === "denied"
+                  ? "Notificações bloqueadas no navegador. Habilite nas configurações do dispositivo."
+                  : "Liga ou desliga todas as notificações automáticas de uma vez."}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            {masterUpdating && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+            <Switch
+              checked={allEnabled}
+              onCheckedChange={handleMasterToggle}
+              disabled={masterUpdating || updatingKey !== null || pushStatus === "denied" || triggers.length === 0}
+            />
+          </div>
+        </CardContent>
+      </Card>
 
       <Card className="rounded-xl border border-border">
         <CardHeader>
