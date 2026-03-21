@@ -98,10 +98,8 @@ def _worker(session_token: str, login_email: str, password: str, conn: Connectio
             )
             return
 
-        try:
-            s.change_balance("REAL")
-        except Exception:
-            pass
+        # NÃO define a conta aqui — quem define é start_bot, que recebe accountMode do usuário.
+        # Definir "REAL" aqui sobrescreveria a escolha do usuário entre REAL e PRACTICE.
 
         resolved_email = profile_email or typed_email
         conn.send({"ok": True, "data": {"email": resolved_email}})
