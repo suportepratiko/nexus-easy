@@ -59,7 +59,7 @@ BALANCE_RETRY_WAIT_SEC = 4
 # Lucro mínimo (R$) para considerar WIN; abaixo disso = LOSS (evita erro por arredondamento/atraso).
 MIN_PROFIT_FOR_WIN = 0.50
 # Ativos que não suportam nenhuma modalidade na corretora — nunca entrar.
-BLOCKED_ACTIVES = {"Yen_Index"}
+BLOCKED_ACTIVES = {"Yen_Index", "Dollar_Index"}
 # Intervalo padrão para verificar se ainda há posição aberta na corretora.
 POLL_OPEN_POSITIONS_INTERVAL_SEC = 5
 # Em ciclo de martingale (mg_level > 0), usar polling mais curto para reentrada mais rápida.
