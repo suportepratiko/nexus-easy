@@ -1329,6 +1329,14 @@ def _run_bot(token: str, s, config: dict) -> None:
                 )
                 last_heartbeat_log_ts = now_loop
 
+            # Log de início de iteração para rastrear estado do martingale
+            logging.info(
+                "bot_runner: [LOOP] nova iteração | mg_level=%d | max_mg=%d | current_active=%s | last_bucket=%d",
+                mg_level, max_mg,
+                (current_active or {}).get("name") if current_active else None,
+                last_processed_bucket,
+            )
+
             # Esperar até não haver operação rolando na corretora (qualquer ativo).
             # Em martingale, reduz o intervalo para acelerar a reentrada após loss.
             poll_interval = (
@@ -2075,11 +2083,18 @@ def _run_bot(token: str, s, config: dict) -> None:
             # EMPATE (draw): não encerra, retenta no mesmo nível.
             entry_finished = bool(is_win or (is_win is False and mg_level >= max_mg))
 
+            logging.info(
+                "bot_runner: [MARTINGALE] resultado=%s | mg_level_antes=%d | max_mg=%d | entry_finished=%s",
+                "WIN" if is_win else ("LOSS" if is_win is False else "DRAW"),
+                mg_level, max_mg, entry_finished,
+            )
+
             if mg_level == 0:
                 last_processed_bucket = minute_bucket
 
             # Atualizar nível de martingale para a PRÓXIMA operação.
             # EMPATE (is_win=None): mantém mg_level, retenta.
+            mg_level_antes = mg_level
             if is_win:
                 mg_level = 0
             elif is_win is False:
@@ -2088,6 +2103,13 @@ def _run_bot(token: str, s, config: dict) -> None:
                 else:
                     mg_level = 0
             # is_win is None (draw): mg_level permanece
+
+            logging.info(
+                "bot_runner: [MARTINGALE] mg_level atualizado: %d → %d | current_active=%s | last_bucket=%d",
+                mg_level_antes, mg_level,
+                (current_active or {}).get("name") if current_active else None,
+                last_processed_bucket,
+            )
 
             # Se o ciclo foi concluído (win em qualquer nível OU loss final), incrementa contador de entradas.
             if entry_finished:
