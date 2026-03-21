@@ -63,6 +63,12 @@ export default defineConfig(({ mode }) => ({
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
       },
       manifest: false, // Usa o manifest.json existente em /public
+      // devOptions: serve o SW também em modo dev (npm start / vite dev)
+      // Sem isso, o sw.js não existe em dev e o push nunca registra
+      devOptions: {
+        enabled: true,
+        type: "module",
+      },
     }),
   ].filter(Boolean),
   resolve: {
