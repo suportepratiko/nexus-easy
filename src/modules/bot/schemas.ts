@@ -73,7 +73,7 @@ export const StrategyConfigSchema = z.object({
   /** Se true, entra no início da próxima vela (M1) após o gatilho; se false, entra imediatamente. */
   waitNextCandle: z.boolean().default(true),
 
-  /** Conta da corretora: REAL (dinheiro real) ou PRACTICE (conta demo). */
+  /** Conta da corretora: "REAL" ou "PRACTICE" (demo). */
   accountMode: z.enum(["REAL", "PRACTICE"]).default("REAL"),
 });
 

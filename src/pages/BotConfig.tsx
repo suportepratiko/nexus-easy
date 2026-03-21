@@ -23,8 +23,6 @@ import {
   Hash,
   Sparkles,
   Search,
-  FlaskConical,
-  AlertTriangle,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
@@ -82,10 +80,10 @@ export default function BotConfigPage() {
   const [strategySearch, setStrategySearch] = useState("");
   const [customStrategiesList, setCustomStrategiesList] = useState<CustomStrategy[]>([]);
   const [realBalance, setRealBalance] = useState<number | null>(null);
+  const [demoBalance, setDemoBalance] = useState<number | null>(null);
+  const [accountMode, setAccountMode] = useState<"REAL" | "PRACTICE">("REAL");
   const [balanceLoading, setBalanceLoading] = useState(false);
   const [waitNextCandle, setWaitNextCandle] = useState(true);
-  const [accountMode, setAccountMode] = useState<"REAL" | "PRACTICE">("REAL");
-  const [demoBalance, setDemoBalance] = useState<number | null>(null);
 
   const toggleModality = (value: AssetModality) => {
     if (isRunning) return;
@@ -136,13 +134,14 @@ export default function BotConfigPage() {
         if (cancelled) return;
         const list = res?.balances;
         if (Array.isArray(list) && list.length > 0) {
+          // Somar apenas conta real (type === 1). Ignorar demo/prática.
           const real = list
             .filter((b: { type?: number }) => b?.type === 1)
             .reduce((sum: number, b: { amount?: number }) => sum + (Number(b?.amount) || 0), 0);
           const demo = list
             .filter((b: { type?: number }) => b?.type === 4)
             .reduce((sum: number, b: { amount?: number }) => sum + (Number(b?.amount) || 0), 0);
-          setRealBalance(real);
+          setRealBalance(real > 0 ? real : null);
           setDemoBalance(demo > 0 ? demo : null);
         } else {
           setRealBalance(null);
@@ -184,8 +183,8 @@ export default function BotConfigPage() {
           setStrategies(valid.length ? valid : ["otc"]);
         }
         setWaitNextCandle((cfg as any).waitNextCandle ?? true);
-        const mode = (cfg as any).accountMode;
-        if (mode === "REAL" || mode === "PRACTICE") setAccountMode(mode);
+        if ((cfg as any).accountMode === "PRACTICE") setAccountMode("PRACTICE");
+        else setAccountMode("REAL");
       })
       .catch(() => {
         // ignore load errors; mantém defaults locais da tela
@@ -233,27 +232,20 @@ export default function BotConfigPage() {
   const handleStart = () => {
     const cfg = buildConfig();
     if (!cfg) return;
-
-    const isDemo = cfg.accountMode === "PRACTICE";
-    const activeBalance = isDemo ? demoBalance : realBalance;
-
-    // Usa o saldo real da conta selecionada como banca
+    const activeBalance = accountMode === "PRACTICE" ? demoBalance : realBalance;
     if (activeBalance !== null && activeBalance > 0) {
       cfg.bankroll = activeBalance;
     }
-
-    // Verifica saldo suficiente para ao menos uma entrada
     if (activeBalance !== null && cfg.entryValue > activeBalance) {
-      const label = isDemo ? "demo" : "real";
+      const label = accountMode === "PRACTICE" ? "demo" : "real";
       toast.error(
-        `Saldo insuficiente na conta ${label}. Banca: R$ ${activeBalance.toFixed(2)} | Entrada: R$ ${cfg.entryValue.toFixed(2)}.`,
+        `Saldo insuficiente na conta ${label}. Banca: R$ ${activeBalance.toFixed(2)}, entrada: R$ ${cfg.entryValue.toFixed(2)}.`,
         { duration: 6000 }
       );
       return;
     }
-
     startBot(cfg);
-    const label = isDemo ? "DEMO (conta prática)" : "REAL";
+    const label = accountMode === "PRACTICE" ? "DEMO" : "REAL";
     toast.success(`Robô iniciado na conta ${label}.`);
     navigate("/");
   };
@@ -274,8 +266,9 @@ export default function BotConfigPage() {
     toast.info("Robô parado.");
   };
 
-  // Banca efetiva usada para cálculos (saldo real da corretora, se disponível; senão, bankroll configurado)
-  const effectiveBankroll = (realBalance !== null && realBalance > 0 ? realBalance : Number(bankroll)) || 0;
+  // Banca efetiva usada para cálculos (saldo da conta selecionada, ou bankroll configurado)
+  const activeBalance = accountMode === "PRACTICE" ? demoBalance : realBalance;
+  const effectiveBankroll = (activeBalance !== null && activeBalance > 0 ? activeBalance : Number(bankroll)) || 0;
   const stopGainPercent = Number(stopGainValue) || 0;
   const stopLossPercent = Number(stopLossValue) || 0;
   const stopGainTargetValue =
@@ -362,55 +355,60 @@ export default function BotConfigPage() {
             <CardDescription>Defina o valor de entrada</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* Seletor de conta: REAL ou DEMO */}
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">Conta de Operação</Label>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  disabled={isRunning}
-                  onClick={() => setAccountMode("REAL")}
-                  className={`flex flex-col items-center gap-1 rounded-lg border-2 p-3 text-sm font-semibold transition-all ${
-                    accountMode === "REAL"
-                      ? "border-primary bg-primary/10 text-primary"
-                      : "border-border bg-transparent text-muted-foreground hover:border-primary/40"
-                  } disabled:opacity-50 disabled:cursor-not-allowed`}
-                >
-                  <DollarSign className="h-4 w-4" />
-                  REAL
-                  {realBalance !== null && (
-                    <span className="text-[10px] font-normal opacity-70">
-                      {balanceLoading ? "…" : `R$ ${formatBrl(realBalance)}`}
-                    </span>
-                  )}
-                </button>
-                <button
-                  type="button"
-                  disabled={isRunning}
-                  onClick={() => setAccountMode("PRACTICE")}
-                  className={`flex flex-col items-center gap-1 rounded-lg border-2 p-3 text-sm font-semibold transition-all ${
-                    accountMode === "PRACTICE"
-                      ? "border-yellow-500 bg-yellow-500/10 text-yellow-500"
-                      : "border-border bg-transparent text-muted-foreground hover:border-yellow-500/40"
-                  } disabled:opacity-50 disabled:cursor-not-allowed`}
-                >
-                  <FlaskConical className="h-4 w-4" />
-                  DEMO
-                  {demoBalance !== null && (
-                    <span className="text-[10px] font-normal opacity-70">
-                      {balanceLoading ? "…" : `R$ ${formatBrl(demoBalance)}`}
-                    </span>
-                  )}
-                </button>
-              </div>
-              {accountMode === "PRACTICE" && (
-                <div className="flex items-start gap-2 rounded-lg border border-yellow-500/40 bg-yellow-500/10 px-3 py-2 text-xs text-yellow-600 dark:text-yellow-400">
-                  <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                  Conta DEMO — operações com dinheiro virtual. Nenhum valor real é movimentado.
+            {isBrokerConnected && (
+              <div className="space-y-3">
+                {/* Seletor REAL / DEMO */}
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    disabled={isRunning}
+                    onClick={() => setAccountMode("REAL")}
+                    className={`rounded-lg border p-2.5 text-left transition-all ${
+                      accountMode === "REAL"
+                        ? "border-emerald-500 bg-emerald-500/10"
+                        : "border-border bg-muted/30 hover:bg-muted/50"
+                    }`}
+                  >
+                    <p className={`text-[10px] font-semibold uppercase tracking-wider mb-0.5 ${accountMode === "REAL" ? "text-emerald-400" : "text-muted-foreground"}`}>
+                      Real
+                    </p>
+                    {balanceLoading ? (
+                      <p className="text-sm font-semibold tabular-nums">…</p>
+                    ) : (
+                      <p className={`text-sm font-bold tabular-nums ${accountMode === "REAL" ? "text-foreground" : "text-muted-foreground"}`}>
+                        {realBalance !== null ? `R$ ${formatBrl(realBalance)}` : "—"}
+                      </p>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isRunning}
+                    onClick={() => setAccountMode("PRACTICE")}
+                    className={`rounded-lg border p-2.5 text-left transition-all ${
+                      accountMode === "PRACTICE"
+                        ? "border-yellow-500 bg-yellow-500/10"
+                        : "border-border bg-muted/30 hover:bg-muted/50"
+                    }`}
+                  >
+                    <p className={`text-[10px] font-semibold uppercase tracking-wider mb-0.5 ${accountMode === "PRACTICE" ? "text-yellow-400" : "text-muted-foreground"}`}>
+                      Demo
+                    </p>
+                    {balanceLoading ? (
+                      <p className="text-sm font-semibold tabular-nums">…</p>
+                    ) : (
+                      <p className={`text-sm font-bold tabular-nums ${accountMode === "PRACTICE" ? "text-foreground" : "text-muted-foreground"}`}>
+                        {demoBalance !== null ? `R$ ${formatBrl(demoBalance)}` : "—"}
+                      </p>
+                    )}
+                  </button>
                 </div>
-              )}
-            </div>
-
+                {accountMode === "PRACTICE" && (
+                  <p className="text-xs text-yellow-500/80 font-medium">
+                    ⚠️ Operando na conta demo. Sem dinheiro real.
+                  </p>
+                )}
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="entry">Valor de Entrada (R$)</Label>
               <Input
