@@ -236,7 +236,19 @@ export default function DashboardPage() {
         <div className="space-y-5">
           <div className="space-y-5">
             {/* Card Área de operação / Status */}
-            <Card className="rounded-xl border border-border bg-card overflow-hidden border-neon">
+            <Card className="relative rounded-xl border border-border bg-card overflow-hidden border-neon">
+              {/* Badge REAL/DEMO — canto superior direito, pequeno */}
+              {config?.accountMode === "PRACTICE" ? (
+                <div className="absolute top-2.5 right-3 inline-flex items-center gap-1 rounded-md border border-yellow-500/50 bg-yellow-500/10 px-1.5 py-0.5">
+                  <span className="h-1 w-1 rounded-full bg-yellow-400" />
+                  <span className="text-[10px] font-bold tracking-wide text-yellow-400">DEMO</span>
+                </div>
+              ) : (
+                <div className="absolute top-2.5 right-3 inline-flex items-center gap-1 rounded-md border border-emerald-500/50 bg-emerald-500/10 px-1.5 py-0.5">
+                  <span className="h-1 w-1 rounded-full bg-emerald-400" />
+                  <span className="text-[10px] font-bold tracking-wide text-emerald-400">REAL</span>
+                </div>
+              )}
               <CardContent className="p-5">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                   <div className="flex items-center gap-3">
@@ -255,22 +267,11 @@ export default function DashboardPage() {
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <div className="inline-flex items-center gap-2 rounded-lg bg-primary/15 border border-primary/30 px-4 py-2 shadow-[0_0_12px_hsl(var(--primary)_/_0.15)]">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <div className="inline-flex items-center gap-2 rounded-lg bg-primary/15 border border-primary/30 px-3 py-2 shadow-[0_0_12px_hsl(var(--primary)_/_0.15)]">
                       <span className="h-2 w-2 rounded-full bg-primary animate-pulse" />
                       <span className="text-sm font-semibold text-primary">Robô operando</span>
                     </div>
-                    {config?.accountMode === "PRACTICE" ? (
-                      <div className="inline-flex items-center gap-1.5 rounded-lg border border-yellow-500/50 bg-yellow-500/10 px-3 py-2">
-                        <span className="h-1.5 w-1.5 rounded-full bg-yellow-400" />
-                        <span className="text-xs font-bold tracking-wide text-yellow-400">DEMO</span>
-                      </div>
-                    ) : (
-                      <div className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/50 bg-emerald-500/10 px-3 py-2">
-                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                        <span className="text-xs font-bold tracking-wide text-emerald-400">REAL</span>
-                      </div>
-                    )}
                     <Button
                       variant="outline"
                       size="sm"
