@@ -32,7 +32,8 @@ def _normalize_balances(raw: Any) -> list[dict[str, Any]]:
         items = raw["msg"]
     else:
         items = raw if isinstance(raw, list) else [raw]
-    return [b for b in items if isinstance(b, dict) and b.get("type") == 1]
+    # Retorna REAL (type=1) e PRACTICE/demo (type=4)
+    return [b for b in items if isinstance(b, dict) and b.get("type") in (1, 4)]
 
 
 def _worker(session_token: str, login_email: str, password: str, conn: Connection):
