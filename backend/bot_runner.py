@@ -1588,11 +1588,13 @@ def _run_bot(token: str, s, config: dict) -> None:
                     if state.get("running") and must_wait:
                         time.sleep(0.3)
                 
-                # Revalidação (apenas quando wait_next_candle): vela de sinal já FECHOU — se não bater mais, aborta
-                # AGORA APLICA PARA TODAS AS ESTRATÉGIAS (built-in E customizadas)
+                # Revalidação (apenas quando wait_next_candle E mg_level == 0):
+                # vela de sinal já FECHOU — se não bater mais, aborta.
+                # Em martingale (mg_level > 0) NÃO revalida: o sinal original já foi válido,
+                # e a vela de loss nunca confirmaria a mesma direção (causaria abort incorreto).
                 get_candles_fn = getattr(s, "get_candles", None)
                 get_ts_fn = getattr(s, "get_server_timestamp", lambda: int(time.time()))
-                if must_wait and callable(get_candles_fn):
+                if must_wait and mg_level == 0 and callable(get_candles_fn):
                     guard_ok = _revalidate_signal_on_closed(
                         active, direction, current_strategy, current_candle_from,
                         get_candles_fn, get_ts_fn, custom_strategies_map
@@ -1606,6 +1608,8 @@ def _run_bot(token: str, s, config: dict) -> None:
                             get_candles_fn, get_ts_fn, custom_strategies_map
                         )
                 else:
+                    if mg_level > 0:
+                        logging.info("bot_runner (Lider): revalidação IGNORADA para martingale mg_level=%d — entrando diretamente.", mg_level)
                     guard_ok = True
                 
                 logging.info("bot_runner (Lider): disparando gatilho em %s (segundo=%d) revalidação=%s...",
@@ -1705,20 +1709,27 @@ def _run_bot(token: str, s, config: dict) -> None:
                         candle_from, candle_open, market_price = snapshot
                         price_guard_ok = _is_valid_open_price_guard(direction, candle_open, market_price)
                         if not price_guard_ok:
-                            logging.warning(
-                                "bot_runner: VALIDAÇÃO DE PREÇO FALHOU — abortando entrada | "
-                                "ativo=%s estratégia=%s direção=%s abertura=%.5f preço_atual=%.5f",
-                                active, current_strategy or "—", direction, candle_open, market_price
-                            )
-                            if not skip_publish:
-                                _publish_shared_signal(
-                                    shared_bus_key, minute_bucket, active, active_type, direction, current_strategy,
-                                    status="aborted_price_guard", signals_data=found_any
+                            if mg_level > 0:
+                                # Martingale: price guard não aborta — entra mesmo assim para honrar o martingale
+                                logging.warning(
+                                    "bot_runner: validação de preço desfavorável em martingale mg_level=%d — entrando mesmo assim | "
+                                    "ativo=%s dir=%s abertura=%.5f preço=%.5f",
+                                    mg_level, active, direction, candle_open, market_price
                                 )
-                            if mg_level == 0:
+                            else:
+                                logging.warning(
+                                    "bot_runner: VALIDAÇÃO DE PREÇO FALHOU — abortando entrada | "
+                                    "ativo=%s estratégia=%s direção=%s abertura=%.5f preço_atual=%.5f",
+                                    active, current_strategy or "—", direction, candle_open, market_price
+                                )
+                                if not skip_publish:
+                                    _publish_shared_signal(
+                                        shared_bus_key, minute_bucket, active, active_type, direction, current_strategy,
+                                        status="aborted_price_guard", signals_data=found_any
+                                    )
                                 current_active = None
                                 last_processed_bucket = minute_bucket
-                            continue
+                                continue
                         else:
                             logging.debug(
                                 "bot_runner: validação de preço OK | ativo=%s dir=%s abertura=%.5f preço=%.5f",
