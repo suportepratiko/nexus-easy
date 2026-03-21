@@ -3,6 +3,10 @@
  * Inicia o backend FastAPI usando o venv do projeto.
  * Carrega .env da raiz e repassa ao processo Python.
  */
+// Silencia EPIPE (pipe fechado ao reiniciar/encerrar o processo)
+process.stdout.on("error", (e) => { if (e.code !== "EPIPE") throw e; });
+process.stderr.on("error", (e) => { if (e.code !== "EPIPE") throw e; });
+
 const { spawn, execSync } = require("child_process");
 const path = require("path");
 const fs = require("fs");
