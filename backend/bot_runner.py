@@ -938,9 +938,8 @@ def _run_bot(token: str, s, config: dict) -> None:
     last_heartbeat_log_ts = 0
     # Evita re-entrar no mesmo minuto se já houve uma tentativa (sucesso ou falha)
     last_processed_bucket = -1
-    # Contador de erros consecutivos no loop principal (protege contra crash-loop)
+    # Contador de erros consecutivos no loop principal (aumenta o sleep, nunca encerra)
     _consecutive_errors = 0
-    _MAX_CONSECUTIVE_ERRORS = 10
     
     # Parâmetros de trading da config
     logging.info(
@@ -2194,19 +2193,27 @@ def _run_bot(token: str, s, config: dict) -> None:
                 )
                 break
 
+        except KeyError as e:
+            # Ativo não existe no mapa da corretora — bloqueia dinamicamente e continua
+            bad_active = str(e).strip("'\"")
+            if bad_active:
+                BLOCKED_ACTIVES.add(bad_active)
+                logging.error(
+                    "bot_runner: ativo '%s' não suportado — bloqueado dinamicamente, continuando.", bad_active
+                )
+            _consecutive_errors = 0  # não conta como erro fatal
+            if not _interruptible_sleep(2, state):
+                break
+            continue
         except Exception as e:
             _consecutive_errors += 1
             logging.exception(
                 "bot_runner: loop error (%d/%d): %s",
                 _consecutive_errors, _MAX_CONSECUTIVE_ERRORS, e,
             )
-            # Erros fatais repetidos encerram o robô; erros transientes apenas dormem e continuam
-            if _consecutive_errors >= _MAX_CONSECUTIVE_ERRORS:
-                logging.error("bot_runner: muitos erros consecutivos (%d), encerrando robô.", _consecutive_errors)
-                state["running"] = False
-                state["error"] = f"Muitos erros consecutivos: {e}"
-                break
-            if not _interruptible_sleep(5, state):
+            # Nunca encerra o robô — aumenta o intervalo de espera conforme os erros acumulam
+            sleep_time = min(5 * _consecutive_errors, 60)  # máx 60s de espera
+            if not _interruptible_sleep(sleep_time, state):
                 break
             continue
         else:
