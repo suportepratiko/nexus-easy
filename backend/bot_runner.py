@@ -1703,18 +1703,24 @@ def _run_bot(token: str, s, config: dict) -> None:
 
                 # 1) Tenta modalidade original com variações de símbolo.
                 last_error = None
+                _digital_key_error = False  # ativo não existe no mapa de digitais
                 for candidate in _active_candidates(active):
                     if active_type == "digital":
                         buy_fn = getattr(s, "buy_digital_spot_v2", None)
                         if callable(buy_fn):
-                            ok, order_val = buy_fn(candidate, price, direction, current_duration)
-                            order_id = order_val
+                            try:
+                                ok, order_val = buy_fn(candidate, price, direction, current_duration)
+                                order_id = order_val
+                            except KeyError:
+                                # Ativo não suporta digital (não existe em OP_code.ACTIVES)
+                                ok, order_id = False, "digital não disponível para este ativo"
+                                _digital_key_error = True
                         else:
                             ok, order_id = False, "digital não disponível"
                     else:
                         ok, order_val = s.buy(price, candidate, direction, current_duration)
                         order_id = order_val
-                    
+
                     if ok:
                         used_active = candidate
                         logging.info("bot_runner: ORDEM ACEITA PELA CORRETORA! Ativo=%s Tipo=%s ID=%s", candidate, active_type, order_id)
@@ -1732,14 +1738,17 @@ def _run_bot(token: str, s, config: dict) -> None:
                         if fallback_type == "digital":
                             buy_fn = getattr(s, "buy_digital_spot_v2", None)
                             if callable(buy_fn):
-                                ok, order_val = buy_fn(candidate, price, direction, current_duration)
-                                order_id = order_val
+                                try:
+                                    ok, order_val = buy_fn(candidate, price, direction, current_duration)
+                                    order_id = order_val
+                                except KeyError:
+                                    ok, order_id = False, "digital não disponível para este ativo"
                             else:
                                 ok, order_id = False, "digital não disponível"
                         else:
                             ok, order_val = s.buy(price, candidate, direction, current_duration)
                             order_id = order_val
-                        
+
                         if ok:
                             used_active = candidate
                             used_type = fallback_type
@@ -1766,6 +1775,12 @@ def _run_bot(token: str, s, config: dict) -> None:
                             active_type,
                             order_id,
                         )
+                    elif "digital não disponível para este ativo" in msg or _digital_key_error:
+                        # Ativo não suporta digital — não é erro fatal, apenas pula este ciclo
+                        logging.warning(
+                            "bot_runner: ativo %s não suporta digital (KeyError) — pulando ciclo sem contar erro",
+                            active,
+                        )
                     else:
                         logging.warning(
                             "bot_runner: falha ao enviar ordem | ativo=%s tipo=%s dir=%s valor=%.2f mg_level=%d msg=%s",
@@ -1778,6 +1793,10 @@ def _run_bot(token: str, s, config: dict) -> None:
                         )
                     if mg_level == 0:
                         last_processed_bucket = minute_bucket
+
+                    # Reseta contador de erros consecutivos para KeyError de digital (não é erro do sistema)
+                    if _digital_key_error:
+                        _consecutive_errors = 0
 
                     time.sleep(5)
                     continue
