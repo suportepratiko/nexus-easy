@@ -256,9 +256,20 @@ export default function DashboardPage() {
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
-                    <div className="inline-flex items-center gap-2 rounded-lg bg-primary/15 border border-primary/30 px-4 py-2 shadow-[0_0_12px_hsl(var(--primary)_/_0.15)]">
-                      <span className="h-2 w-2 rounded-full bg-primary animate-pulse" />
-                      <span className="text-sm font-semibold text-primary">Robô operando</span>
+                    <div className="flex items-center gap-2">
+                      <div className="inline-flex items-center gap-2 rounded-lg bg-primary/15 border border-primary/30 px-4 py-2 shadow-[0_0_12px_hsl(var(--primary)_/_0.15)]">
+                        <span className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+                        <span className="text-sm font-semibold text-primary">Robô operando</span>
+                      </div>
+                      {config?.accountMode === "PRACTICE" ? (
+                        <span className="inline-flex items-center gap-1 rounded-md border border-yellow-500/50 bg-yellow-500/15 px-2.5 py-1 text-xs font-bold text-yellow-500">
+                          DEMO
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded-md border border-emerald-500/50 bg-emerald-500/15 px-2.5 py-1 text-xs font-bold text-emerald-500">
+                          REAL
+                        </span>
+                      )}
                     </div>
                     <Button
                       variant="outline"
