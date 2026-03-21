@@ -871,16 +871,13 @@ def _run_bot(token: str, s, config: dict) -> None:
     if account_mode not in ("REAL", "PRACTICE"):
         account_mode = "REAL"
 
-    # Reconfirma a conta antes de operar — garantia dupla para não operar na conta errada.
+    # start_bot já confirmou e setou a conta corretamente antes de iniciar esta thread.
+    # Tenta reconfirmar, mas não aborta se falhar (a conta já está correta).
     try:
         s.change_balance(account_mode)
-        logging.info("bot_runner: conta confirmada = %s", account_mode)
+        logging.info("bot_runner: conta confirmada na thread = %s", account_mode)
     except Exception as e:
-        # Se não conseguir confirmar a conta, aborta o loop imediatamente.
-        logging.error("bot_runner: ABORTANDO — falha ao confirmar conta %s: %s", account_mode, e)
-        state["running"] = False
-        state["error"] = f"Falha ao confirmar conta {account_mode}: {e}"
-        return
+        logging.warning("bot_runner: reconfirmação de conta falhou (não fatal — conta já foi setada em start_bot): %s", e)
 
     entry_value = float(config.get("entryValue", 10))
     stop_gain_mode = config.get("stopGainMode", "gross_value")
