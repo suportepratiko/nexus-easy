@@ -652,20 +652,28 @@ class Safirion:
 
     def get_candles(self, ACTIVES, interval, count, endtime):
         self.api.candles.candles_data = None
-        while True:
+        _max_attempts = 3
+        for _attempt in range(_max_attempts):
             try:
                 if ACTIVES not in OP_code.ACTIVES:
                     print('Asset {} not found on consts'.format(ACTIVES))
                     break
                 self.api.getcandles(
                     OP_code.ACTIVES[ACTIVES], interval, count, endtime)
-                while self.check_connect and self.api.candles.candles_data == None:
-                    pass
-                if self.api.candles.candles_data != None:
+                # Spin-wait com timeout de 15s para evitar trava infinita
+                _deadline = time.time() + 15
+                while self.check_connect and self.api.candles.candles_data is None:
+                    if time.time() > _deadline:
+                        logging.error('**error** get_candles timeout — sem dados em 15s')
+                        break
+                    time.sleep(0.05)
+                if self.api.candles.candles_data is not None:
                     break
-            except:
-                logging.error('**error** get_candles need reconnect')
-                self.connect()
+            except Exception:
+                logging.error('**error** get_candles need reconnect (tentativa %d/%d)', _attempt + 1, _max_attempts)
+                if _attempt < _max_attempts - 1:
+                    self.connect()
+                    time.sleep(2)
 
         return self.api.candles.candles_data
 

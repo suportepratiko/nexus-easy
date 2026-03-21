@@ -1469,6 +1469,8 @@ async def websocket_endpoint(websocket: WebSocket, token: str = None):
                 if not state:
                     data = {"status": "idle", "running": False}
                 else:
+                    # Envia apenas as últimas 50 operações para reduzir payload do WS
+                    ops = state.get("operations") or []
                     data = {
                         "status": "running" if state.get("running") else "stopped",
                         "running": state.get("running", False),
@@ -1476,7 +1478,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str = None):
                         "start_balance": state.get("start_balance", 0),
                         "current_balance": state.get("current_balance", 0),
                         "total_profit": state.get("total_profit", 0),
-                        "operations": state.get("operations", []),
+                        "operations": ops[-50:],
                         "stop_reason": state.get("stop_reason"),
                         "error": state.get("error"),
                     }
