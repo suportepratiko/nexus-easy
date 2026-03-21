@@ -41,8 +41,20 @@ export function usePushNotifications() {
         setStatus("granted");
       }
 
-      // 2) Pega o SW
-      const reg = await navigator.serviceWorker.ready;
+      // 2) Pega o SW — com timeout pois serviceWorker.ready pode travar indefinidamente
+      const swReady = Promise.race([
+        navigator.serviceWorker.ready,
+        new Promise<never>((_, rej) => setTimeout(() => rej(new Error("SW timeout")), 8000)),
+      ]);
+      // Tenta pegar SW ativo já registrado (mais rápido, evita o timeout)
+      let reg: ServiceWorkerRegistration;
+      try {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        const active = regs.find((r) => r.active);
+        reg = active ?? await swReady;
+      } catch {
+        reg = await swReady;
+      }
 
       // 3) Subscribe push
       const old = await reg.pushManager.getSubscription();
