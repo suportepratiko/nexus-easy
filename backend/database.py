@@ -386,5 +386,5 @@ def init_db() -> None:
         conn.execute(text("CREATE INDEX IF NOT EXISTS idx_user_ops_email_ts ON user_operations (user_email, \"timestamp\" DESC)"))
         conn.execute(text("CREATE INDEX IF NOT EXISTS idx_webhook_payloads_processed ON webhook_payloads (processed)"))
         conn.execute(text("CREATE INDEX IF NOT EXISTS idx_email_logs_created ON email_logs (created_at DESC)"))
-        conn.execute(text("CREATE INDEX IF NOT EXISTS idx_users_plan_expires ON users (plan_expires_at)"))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS idx_users_plan_expires ON users (expires_at)"))
 
