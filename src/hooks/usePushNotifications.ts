@@ -39,11 +39,11 @@ export function usePushNotifications() {
   const registerSw = useCallback(async (): Promise<ServiceWorkerRegistration | null> => {
     if (!("serviceWorker" in navigator)) return null;
     try {
-      const reg = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
-      await reg.update();
+      // Usa o SW já registrado pelo vite-plugin-pwa; não registra um novo
+      const reg = await navigator.serviceWorker.ready;
       return reg;
     } catch (e) {
-      setError("Falha ao registrar service worker.");
+      setError("Falha ao acessar service worker.");
       setStatus("error");
       return null;
     }

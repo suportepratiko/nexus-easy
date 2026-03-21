@@ -52,29 +52,15 @@ export default defineConfig(({ mode }) => ({
     react(),
     mode === "development" && componentTagger(),
     VitePWA({
+      // injectManifest: usa src/sw.js como base (tem push handler) e injeta o precache manifest
+      strategies: "injectManifest",
+      srcDir: "src",
+      filename: "sw.js",
       registerType: "autoUpdate",
       injectRegister: "auto",
-      workbox: {
-        // Cache do app shell (HTML, JS, CSS) — serve instantâneo no re-open
+      injectManifest: {
+        // Arquivos a pré-cachear
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
-        navigateFallback: "/index.html",
-        navigateFallbackDenylist: [/^\/api/, /^\/ws/, /^\/health/],
-        runtimeCaching: [
-          {
-            // Recursos estáticos: cache primeiro, atualiza em background
-            urlPattern: /\.(js|css|woff2|png|svg|ico)$/,
-            handler: "CacheFirst",
-            options: {
-              cacheName: "static-assets",
-              expiration: { maxAgeSeconds: 60 * 60 * 24 * 30 }, // 30 dias
-            },
-          },
-          {
-            // API: sempre rede, sem cache
-            urlPattern: /^https?:\/\/.*\/api\//,
-            handler: "NetworkOnly",
-          },
-        ],
       },
       manifest: false, // Usa o manifest.json existente em /public
     }),
