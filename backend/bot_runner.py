@@ -1130,11 +1130,11 @@ def _run_bot(token: str, s, config: dict) -> None:
             get_candles = getattr(s, "get_candles", None)
             get_ts = getattr(s, "get_server_timestamp", None)
             if not callable(get_candles):
-                return None, None, None
+                return (None, None, None, 1, 0), {}
 
             actives = _get_available_actives()
             if not actives:
-                return None, None, None
+                return (None, None, None, 1, 0), {}
 
             # Alterna prioridade de mercado quando open e otc estão ativos juntos,
             # para não enviesar a busca sempre para um único lado.
@@ -1268,7 +1268,7 @@ def _run_bot(token: str, s, config: dict) -> None:
 
         except Exception as e:
             logging.warning("bot_runner: _find_signal error: %s", e)
-        return (None, None, None, 1), {}
+        return (None, None, None, 1, 0), {}
 
     def _get_current_m1_snapshot(asset_name: str) -> tuple[int, float, float] | None:
         """Snapshot da M1 atual: (inicio_da_vela, abertura, preco_atual)."""
@@ -2208,8 +2208,8 @@ def _run_bot(token: str, s, config: dict) -> None:
         except Exception as e:
             _consecutive_errors += 1
             logging.exception(
-                "bot_runner: loop error (%d/%d): %s",
-                _consecutive_errors, _MAX_CONSECUTIVE_ERRORS, e,
+                "bot_runner: loop error (%d): %s",
+                _consecutive_errors, e,
             )
             # Nunca encerra o robô — aumenta o intervalo de espera conforme os erros acumulam
             sleep_time = min(5 * _consecutive_errors, 60)  # máx 60s de espera
