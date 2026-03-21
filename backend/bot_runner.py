@@ -328,12 +328,16 @@ def _get_shared_signal(bus_key: str, minute_bucket: int) -> tuple[str, str, str,
     )
 
 
-def _save_user_operation(email: str | None, op: dict[str, Any], total_profit: float | None) -> None:
+def _save_user_operation(email: str | None, op: dict[str, Any], total_profit: float | None, account_mode: str = "REAL") -> None:
     """
     Persiste uma operação do robô para uso em relatórios/ranking.
+    Operações de conta PRACTICE (demo) não são salvas no ranking.
     Falhas de gravação não interrompem o robô.
     """
     if not email:
+        return
+    if str(account_mode).upper() == "PRACTICE":
+        logging.info("bot_runner: operação demo ignorada no ranking (account_mode=PRACTICE)")
         return
     try:
         ts_raw = op.get("timestamp") or time.time()
@@ -2072,7 +2076,7 @@ def _run_bot(token: str, s, config: dict) -> None:
                     })
                     # Persiste operação para ranking de usuários (se houver email de sessão).
                     try:
-                        _save_user_operation(session_email, operations[-1], total_profit)
+                        _save_user_operation(session_email, operations[-1], total_profit, account_mode)
                     except Exception:
                         # Erros já são logados dentro de _save_user_operation
                         pass
