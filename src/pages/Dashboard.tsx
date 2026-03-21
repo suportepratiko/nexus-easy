@@ -239,12 +239,12 @@ export default function DashboardPage() {
             <Card className="relative rounded-xl border border-border bg-card overflow-hidden border-neon">
               {/* Badge REAL/DEMO — somente mobile: canto superior direito, pequeno */}
               {config?.accountMode === "PRACTICE" ? (
-                <div className="sm:hidden absolute top-2.5 right-3 inline-flex items-center gap-1 rounded-md border border-yellow-500/50 bg-yellow-500/10 px-1.5 py-0.5">
+                <div className="sm:hidden absolute top-5 right-4 inline-flex items-center gap-1 rounded-md border border-yellow-500/50 bg-yellow-500/10 px-1.5 py-0.5">
                   <span className="h-1 w-1 rounded-full bg-yellow-400" />
                   <span className="text-[10px] font-bold tracking-wide text-yellow-400">DEMO</span>
                 </div>
               ) : (
-                <div className="sm:hidden absolute top-2.5 right-3 inline-flex items-center gap-1 rounded-md border border-emerald-500/50 bg-emerald-500/10 px-1.5 py-0.5">
+                <div className="sm:hidden absolute top-5 right-4 inline-flex items-center gap-1 rounded-md border border-emerald-500/50 bg-emerald-500/10 px-1.5 py-0.5">
                   <span className="h-1 w-1 rounded-full bg-emerald-400" />
                   <span className="text-[10px] font-bold tracking-wide text-emerald-400">REAL</span>
                 </div>
