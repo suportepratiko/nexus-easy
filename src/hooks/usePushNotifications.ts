@@ -3,63 +3,22 @@ import { getPushVapidPublic, savePushSubscription } from "@/lib/api/pwa";
 
 export type PushStatus = "unsupported" | "prompt" | "granted" | "denied" | "subscribed" | "error";
 
-/** Aguarda SW ativo; resolve com timeout de segurança. */
-function waitForActive(reg: ServiceWorkerRegistration, timeoutMs = 6000): Promise<ServiceWorkerRegistration> {
-  if (reg.active) return Promise.resolve(reg);
-  return new Promise<ServiceWorkerRegistration>((resolve) => {
-    const sw = reg.installing || reg.waiting;
-    if (!sw) { setTimeout(() => resolve(reg), 500); return; }
-    const onStateChange = () => {
-      if (sw.state === "activated" || sw.state === "active" as ServiceWorkerState) {
-        sw.removeEventListener("statechange", onStateChange);
-        resolve(reg);
-      }
-    };
-    sw.addEventListener("statechange", onStateChange);
-    setTimeout(() => resolve(reg), timeoutMs);
-  });
-}
-
-/**
- * Garante que existe um SW ativo para usar o PushManager.
- *
- * Estratégia:
- * 1) navigator.serviceWorker.ready — em PWA instalado resolve imediatamente.
- *    Timeout de 4s para não travar num browser sem SW.
- * 2) getRegistrations() — pega qualquer SW já registrado na origem.
- * 3) Registro manual de /sw.js como último recurso.
- */
-async function ensureServiceWorker(): Promise<ServiceWorkerRegistration | null> {
+/** Obtém ou registra o Service Worker. */
+async function getServiceWorker(): Promise<ServiceWorkerRegistration | null> {
   if (!("serviceWorker" in navigator)) return null;
-
-  // 1) serviceWorker.ready — mais confiável em PWA instalado (SW já ativo)
   try {
-    const ready = await Promise.race([
+    // serviceWorker.ready resolve imediatamente se o SW já está ativo (PWA instalado)
+    const reg = await Promise.race([
       navigator.serviceWorker.ready,
-      new Promise<null>((r) => setTimeout(() => r(null), 4000)),
+      new Promise<null>((r) => setTimeout(() => r(null), 5000)),
     ]) as ServiceWorkerRegistration | null;
-    if (ready?.active) return ready;
-  } catch (err) {
-    console.warn("[push] serviceWorker.ready:", err);
-  }
-
-  // 2) Busca qualquer registration ativa na origem (funciona quando .ready falha)
+    if (reg) return reg;
+  } catch (_) { /* continua */ }
+  // Fallback: registra manualmente
   try {
-    const regs = await navigator.serviceWorker.getRegistrations();
-    const active = regs.find((r) => r.active);
-    if (active) return active;
-    // Ainda há registrations em ativação — espera a primeira
-    if (regs.length > 0) return waitForActive(regs[0]);
+    return await navigator.serviceWorker.register("/sw.js", { scope: "/" });
   } catch (err) {
-    console.warn("[push] getRegistrations:", err);
-  }
-
-  // 3) Sem SW algum — registra manualmente
-  try {
-    const reg = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
-    return waitForActive(reg);
-  } catch (err) {
-    console.error("[push] register falhou:", err);
+    console.error("[push] SW register erro:", err);
     return null;
   }
 }
@@ -68,6 +27,7 @@ export function usePushNotifications() {
   const [status, setStatus] = useState<PushStatus>("prompt");
   const [error, setError] = useState<string | null>(null);
 
+  // Verifica estado inicial (sem pedir permissão)
   useEffect(() => {
     if (!("Notification" in window) || !("PushManager" in window)) {
       setStatus("unsupported");
@@ -77,93 +37,97 @@ export function usePushNotifications() {
       setStatus("denied");
       return;
     }
-    let cancelled = false;
-    (async () => {
-      try {
-        const reg = await ensureServiceWorker();
-        if (!reg || cancelled) return;
-        const sub = await reg.pushManager?.getSubscription?.();
-        if (cancelled) return;
-        if (Notification.permission === "granted" && sub) {
-          setStatus("subscribed");
-        } else if (Notification.permission === "granted") {
-          setStatus("granted");
-        }
-      } catch {
-        if (!cancelled) setStatus("prompt");
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
+    if (Notification.permission === "granted") {
+      // Verifica se tem subscription ativa
+      navigator.serviceWorker.ready
+        .then((reg) => reg.pushManager?.getSubscription())
+        .then((sub) => { if (sub) setStatus("subscribed"); })
+        .catch(() => { /* ignora */ });
+    }
   }, []);
 
-  const enable = useCallback(async (onSuccess?: () => void, onError?: (message: string) => void) => {
+  /**
+   * Ativa notificações push.
+   * IMPORTANTE: deve ser chamado a partir de um clique/toque do usuário.
+   * No iOS, requestPermission() precisa estar dentro do contexto do gesto.
+   */
+  const enable = useCallback(async (
+    onSuccess?: () => void,
+    onError?: (message: string) => void,
+  ) => {
     setError(null);
+
+    // 1. Suporte básico
     if (!("Notification" in window) || !("PushManager" in window)) {
-      setStatus("unsupported");
       const msg = "Seu navegador não suporta notificações push.";
+      setStatus("unsupported");
       setError(msg);
       onError?.(msg);
       return;
     }
-    const permission = Notification.permission;
-    if (permission === "denied") {
+
+    // 2. Já bloqueado
+    if (Notification.permission === "denied") {
+      const msg = "Notificações bloqueadas. Habilite nas configurações do dispositivo.";
       setStatus("denied");
-      const msg = "Notificações foram bloqueadas. Habilite nas configurações do navegador.";
       setError(msg);
       onError?.(msg);
       return;
     }
-    const reg = await ensureServiceWorker();
-    if (!reg) {
-      const msg = "Não foi possível iniciar o service worker. Tente fechar e reabrir o app.";
-      setError(msg);
-      setStatus("error");
-      onError?.(msg);
-      return;
-    }
-    if (permission !== "granted") {
-      const result = await Notification.requestPermission();
+
+    // 3. Pede permissão AGORA (ainda dentro do contexto do gesto do usuário)
+    //    No iOS isso deve acontecer antes de qualquer await pesado.
+    if (Notification.permission !== "granted") {
+      let result: NotificationPermission;
+      try {
+        result = await Notification.requestPermission();
+      } catch {
+        result = "denied";
+      }
       if (result !== "granted") {
         setStatus("denied");
-        const msg = "Permissão negada. Habilite nas configurações do dispositivo.";
+        const msg = "Permissão negada.";
         setError(msg);
         onError?.(msg);
         return;
       }
     }
+
+    // 4. Obtém o Service Worker (após permissão concedida)
+    const reg = await getServiceWorker();
+    if (!reg) {
+      const msg = "Não foi possível iniciar o service worker. Feche e reabra o app.";
+      setStatus("error");
+      setError(msg);
+      onError?.(msg);
+      return;
+    }
+
+    // 5. Inscreve no push
     try {
-      // Sempre cancelar subscription antiga para forçar nova com a chave atual (evita BadJwtToken)
       const pm = reg.pushManager;
-      if (!pm) throw new Error("PushManager não disponível. Abra o app pelo ícone na tela de início.");
+      if (!pm) {
+        const msg = "PushManager não disponível. Abra o app pelo ícone na tela de início.";
+        setStatus("error");
+        setError(msg);
+        onError?.(msg);
+        return;
+      }
+      // Cancela subscription antiga (evita BadJwtToken)
       const existing = await pm.getSubscription();
       if (existing) await existing.unsubscribe();
       const { publicKey } = await getPushVapidPublic();
-      const key = urlB64ToUint8Array(publicKey.trim());
-      const sub = await pm.subscribe({ userVisibleOnly: true, applicationServerKey: key });
+      const sub = await pm.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlB64ToUint8Array(publicKey.trim()),
+      });
       await savePushSubscription(sub, navigator.userAgent);
       setStatus("subscribed");
       onSuccess?.();
     } catch (e) {
-      let msg = "Falha ao ativar notificações push.";
-      if (e && typeof e === "object") {
-        if ("detail" in e) {
-          msg = String((e as { detail: string }).detail);
-        } else if ("message" in e) {
-          const raw = String((e as { message: string }).message);
-          // Mensagem amigável para erros conhecidos
-          if (raw.toLowerCase().includes("pushmanager")) {
-            msg = "Abra o app pelo ícone na tela de início para ativar notificações.";
-          } else if (raw.toLowerCase().includes("permission")) {
-            msg = "Permissão negada. Habilite nas configurações do dispositivo.";
-          } else {
-            msg = raw;
-          }
-        }
-      }
-      setError(msg);
+      const msg = e instanceof Error ? e.message : "Falha ao ativar notificações.";
       setStatus("error");
+      setError(msg);
       onError?.(msg);
     }
   }, []);
