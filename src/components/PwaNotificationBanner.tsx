@@ -1,5 +1,4 @@
 import { usePushNotifications } from "@/hooks/usePushNotifications";
-import { isPwaStandalone } from "@/lib/pwa";
 import { Button } from "@/components/ui/button";
 import { Bell, Loader2, X } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
@@ -7,7 +6,14 @@ import { toast } from "sonner";
 
 const STORAGE_KEY = "pwa-notification-banner-dismissed";
 
-/** Exibido quando o app está aberto como PWA e notificações ainda não foram ativadas. */
+/** Detecta mobile (qualquer browser, incluindo PWA e browser normal). */
+function isMobile(): boolean {
+  if (typeof window === "undefined") return false;
+  return /android|iphone|ipad|ipod/i.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+}
+
+/** Exibido em mobile quando notificações ainda não foram ativadas. */
 export function PwaNotificationBanner() {
   const { status, enable } = usePushNotifications();
   const [visible, setVisible] = useState(false);
@@ -16,12 +22,13 @@ export function PwaNotificationBanner() {
   const autoPromptDone = useRef(false);
 
   useEffect(() => {
-    if (!isPwaStandalone()) return;
+    if (!isMobile()) return;
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
         const t = Number(raw);
-        if (!Number.isNaN(t) && Date.now() - t < 7 * 24 * 60 * 60 * 1000) setDismissed(true);
+        // Após denegar, não pede de novo em 30 dias; demais estados: 1 dia
+        if (!Number.isNaN(t) && Date.now() - t < 24 * 60 * 60 * 1000) setDismissed(true);
       }
     } catch {
       setDismissed(false);
@@ -29,20 +36,20 @@ export function PwaNotificationBanner() {
   }, []);
 
   useEffect(() => {
-    if (!isPwaStandalone() || dismissed) {
+    if (!isMobile() || dismissed) {
       setVisible(false);
       return;
     }
-    if (status === "subscribed" || status === "denied") {
+    if (status === "subscribed" || status === "denied" || status === "unsupported") {
       setVisible(false);
       return;
     }
     setVisible(true);
   }, [status, dismissed]);
 
-  // Pedido automático de permissão ao abrir o PWA (dialog nativo do navegador)
+  // Auto-ativa quando: permissão ainda não pedida ("prompt") OU concedida mas sem subscription ("granted")
   useEffect(() => {
-    if (!visible || status !== "prompt" || loading || autoPromptDone.current) return;
+    if (!visible || (status !== "prompt" && status !== "granted") || loading || autoPromptDone.current) return;
     autoPromptDone.current = true;
     const t = setTimeout(() => {
       setLoading(true);
@@ -58,7 +65,7 @@ export function PwaNotificationBanner() {
           autoPromptDone.current = false; // permite tentar de novo pelo botão
         }
       );
-    }, 700);
+    }, 1000);
     return () => clearTimeout(t);
   }, [visible, status, loading, enable]);
 

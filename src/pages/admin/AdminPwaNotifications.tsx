@@ -54,6 +54,7 @@ import {
   CheckCircle,
   TrendingUp,
   TrendingDown,
+  RotateCcw,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -177,6 +178,13 @@ export default function AdminPwaNotificationsPage() {
     } finally {
       setDeletingAll(false);
     }
+  };
+
+  const handleResend = (item: PwaHistoryItem) => {
+    setModalTitle(item.title);
+    setModalBody(item.body);
+    setModalUrl(item.url ?? "");
+    setModalOpen(true);
   };
 
   const handleSaveTemplate = async (triggerKey: string) => {
@@ -348,20 +356,31 @@ export default function AdminPwaNotificationsPage() {
                               )}
                             </div>
                           </div>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="shrink-0 h-8 w-8 text-muted-foreground hover:text-destructive"
-                            onClick={() => handleDeleteItem(item.id)}
-                            disabled={deletingId !== null}
-                            title="Remover do histórico"
-                          >
-                            {deletingId === item.id ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <Trash2 className="h-4 w-4" />
-                            )}
-                          </Button>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-muted-foreground hover:text-primary"
+                              onClick={() => handleResend(item)}
+                              title="Reenviar esta mensagem"
+                            >
+                              <RotateCcw className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                              onClick={() => handleDeleteItem(item.id)}
+                              disabled={deletingId !== null}
+                              title="Remover do histórico"
+                            >
+                              {deletingId === item.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Trash2 className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </div>
                         </div>
                       </li>
                     ))}
