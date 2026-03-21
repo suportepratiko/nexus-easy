@@ -1125,6 +1125,8 @@ class BotConfigBody(BaseModel):
     customStrategies: list[dict] | None = None
     # Se True, entra na próxima vela M1 após o gatilho; se None/False, entra imediatamente.
     waitNextCandle: bool | None = None
+    # Conta da corretora: "REAL" (dinheiro real) ou "PRACTICE" (conta demo).
+    accountMode: str = "REAL"
 
 
 class PlatformBotConfigResponse(BaseModel):
