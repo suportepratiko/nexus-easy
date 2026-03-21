@@ -972,13 +972,15 @@ def login(request: Request, body: LoginRequest, db: Session = Depends(get_db)):
     
     # Sempre salva o broker_email (necessário para notificações PWA).
     # Se "remember", salva a senha também (para auto-reconectar).
+    p_user_id: int | None = None
     try:
         current_p_user = get_current_user(request, db)
+        p_user_id = current_p_user.id
         current_p_user.broker_email = body.email.strip().lower()
         if body.remember:
             current_p_user.broker_password = _encrypt_password(body.password)
         db.commit()
-        logging.info("Login corretora: broker_email salvo para user_id=%s", current_p_user.id)
+        logging.info("Login corretora: broker_email salvo para user_id=%s", p_user_id)
     except Exception:
         pass # Ignora erro se não estiver logado na plataforma ou se falhar ao salvar
 
@@ -987,6 +989,7 @@ def login(request: Request, body: LoginRequest, db: Session = Depends(get_db)):
         token, resolved_email = _broker_sessions.create_session(
             body.email.strip().lower(),
             body.password,
+            platform_user_id=p_user_id,
         )
         logging.info("Login corretora: OK para %s", body.email)
         logging.info("Login corretora: sessão criada token=%s email=%s", token[:6] + "***", resolved_email)
@@ -1030,6 +1033,7 @@ def reconnect(current_user: User = Depends(get_current_user)):
         token, resolved_email = _broker_sessions.create_session(
             current_user.broker_email,
             _decrypt_password(current_user.broker_password),
+            platform_user_id=current_user.id,
         )
         logging.info("Login corretora (AUTO-RECONECT): OK para %s", current_user.broker_email)
         return LoginResponse(token=token, message="Reconectado com sucesso.")

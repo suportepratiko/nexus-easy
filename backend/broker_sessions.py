@@ -168,6 +168,7 @@ class BrokerSessionHandle:
     email: str
     process: Process
     conn: Connection
+    platform_user_id: int | None = None
     lock: threading.Lock = field(default_factory=threading.Lock)
 
 
@@ -195,23 +196,29 @@ class BrokerSessionsManager:
             except Exception as e:
                 logging.error("broker_sessions: erro no reaper: %s", e)
 
-    def get_session_by_email(self, email: str) -> str | None:
-        """Retorna o token de uma sessão ativa para o email, se existir."""
+    def get_session_by_user(self, platform_user_id: int, email: str) -> str | None:
+        """Retorna token de sessão ativa para o mesmo usuário da plataforma + mesmo email da corretora."""
         norm = email.strip().lower()
         with self._lock:
             for token, handle in self._sessions.items():
-                if handle.email == norm and handle.process.is_alive():
+                if (
+                    handle.platform_user_id == platform_user_id
+                    and handle.email == norm
+                    and handle.process.is_alive()
+                ):
                     return token
         return None
 
-    def create_session(self, email: str, password: str) -> tuple[str, str]:
-        # Se já existe sessão ativa para este email, reutiliza (sincroniza múltiplos dispositivos).
-        existing = self.get_session_by_email(email)
-        if existing:
-            with self._lock:
-                resolved = self._sessions[existing].email
-            logging.info("broker_sessions: sessão reutilizada para email=%s token=%s***", resolved, existing[:6])
-            return existing, resolved
+    def create_session(self, email: str, password: str, platform_user_id: int | None = None) -> tuple[str, str]:
+        # Reutiliza sessão apenas se for o MESMO usuário da plataforma com o MESMO email da corretora.
+        # Isso evita que usuários diferentes compartilhem acidentalmente a mesma sessão.
+        if platform_user_id is not None:
+            existing = self.get_session_by_user(platform_user_id, email)
+            if existing:
+                with self._lock:
+                    resolved = self._sessions[existing].email
+                logging.info("broker_sessions: sessão reutilizada user_id=%s email=%s token=%s***", platform_user_id, resolved, existing[:6])
+                return existing, resolved
 
         token = str(uuid.uuid4())
         parent_conn, child_conn = Pipe()
@@ -230,7 +237,7 @@ class BrokerSessionsManager:
             raise RuntimeError(msg)
 
         resolved_email = str((init.get("data") or {}).get("email") or email).strip().lower()
-        handle = BrokerSessionHandle(token=token, email=resolved_email, process=process, conn=parent_conn)
+        handle = BrokerSessionHandle(token=token, email=resolved_email, process=process, conn=parent_conn, platform_user_id=platform_user_id)
         with self._lock:
             self._sessions[token] = handle
         return token, resolved_email
