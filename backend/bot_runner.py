@@ -1848,6 +1848,7 @@ def _run_bot(token: str, s, config: dict) -> None:
                 # Resultado real: primeiro tenta evento/histórico da corretora (digitais).
                 is_win = None
                 profit = 0.0
+                _order_not_executed = False
                 if used_type == "digital" and order_id is not None:
                     poll_fn = getattr(s, "poll_digital_result", None)
                     if callable(poll_fn):
@@ -1994,15 +1995,17 @@ def _run_bot(token: str, s, config: dict) -> None:
                             )
                             if not _interruptible_sleep(BALANCE_RETRY_WAIT_SEC, state):
                                 break
-                        if used_type == "digital" and abs(profit) < MIN_PROFIT_FOR_WIN:
+                        if abs(profit) < MIN_PROFIT_FOR_WIN:
+                            # Saldo não mudou: ordem não foi executada na corretora (ativo não suportado)
                             is_win = None
-                            logging.info(
-                                "bot_runner: resultado por saldo (digital) | saldo_antes=%.2f saldo_depois=%.2f profit=%.2f -> EMPATE",
-                                float(balance_before), float(balance_after), profit,
+                            _order_not_executed = True
+                            logging.error(
+                                "bot_runner: ordem não executou na corretora (saldo inalterado) | ativo=%s saldo_antes=%.2f saldo_depois=%.2f — operação ignorada",
+                                used_active, float(balance_before), float(balance_after),
                             )
                         else:
                             is_win = profit > MIN_PROFIT_FOR_WIN
-                            logging.info(
+                            logging.error(
                                 "bot_runner: resultado por saldo | saldo_antes=%.2f saldo_depois=%.2f profit=%.2f -> %s",
                                 float(balance_before), float(balance_after), profit,
                                 "WIN" if is_win else "LOSS",
@@ -2034,7 +2037,13 @@ def _run_bot(token: str, s, config: dict) -> None:
 
                 # Atualiza a operação que já está na lista (estava "pending") com o resultado final.
                 if operations and operations[-1].get("result") == "pending" and operations[-1].get("id") == op_id:
-                    if is_win is None:
+                    if _order_not_executed:
+                        # Ordem não foi executada na corretora — remove do histórico
+                        operations.pop()
+                        mg_level = 0  # reseta martingale pois nada foi operado
+                        last_processed_bucket = minute_bucket
+                        continue
+                    elif is_win is None:
                         operations[-1]["result"] = "draw"
                         operations[-1]["profit"] = 0.0
                     else:
