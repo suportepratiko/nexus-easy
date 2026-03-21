@@ -72,7 +72,7 @@ console.error("[backend] API em http://localhost:8001 (frontend em 8000) ...");
 
 const child = spawn(
   venvPython,
-  ["-m", "uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8001", "--reload", "--reload-dir", "backend", "--reload-dir", "safirionapi"],
+  ["-m", "uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8001", "--reload", "--reload-dir", "backend", "--reload-dir", "safirionapi", "--log-level", "error"],
   {
     stdio: "inherit",
     cwd: root,

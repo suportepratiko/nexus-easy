@@ -80,10 +80,19 @@ from backend.email_service import (
 
 # Configuração de log mais verbosa para acompanhar o robô em detalhe
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.ERROR,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
-logging.getLogger().setLevel(logging.INFO)
+logging.getLogger().setLevel(logging.ERROR)
+
+# Silenciar loggers verbosos de bibliotecas externas
+for _noisy in (
+    "uvicorn", "uvicorn.access", "uvicorn.error",
+    "fastapi", "sqlalchemy", "sqlalchemy.engine",
+    "httpx", "httpcore", "websockets", "asyncio",
+    "multipart", "python_multipart",
+):
+    logging.getLogger(_noisy).setLevel(logging.CRITICAL)
 
 # Garantir que as tabelas necessárias existam (idempotente)
 try:
