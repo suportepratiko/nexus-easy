@@ -1848,7 +1848,6 @@ def _run_bot(token: str, s, config: dict) -> None:
                 # Resultado real: primeiro tenta evento/histórico da corretora (digitais).
                 is_win = None
                 profit = 0.0
-                _order_not_executed = False
                 if used_type == "digital" and order_id is not None:
                     poll_fn = getattr(s, "poll_digital_result", None)
                     if callable(poll_fn):
@@ -1996,11 +1995,11 @@ def _run_bot(token: str, s, config: dict) -> None:
                             if not _interruptible_sleep(BALANCE_RETRY_WAIT_SEC, state):
                                 break
                         if abs(profit) < MIN_PROFIT_FOR_WIN:
-                            # Saldo não mudou: ordem não foi executada na corretora (ativo não suportado)
+                            # Saldo não mudou: pode ser empate ou ordem não executada.
+                            # LOSS real sempre muda o saldo em -entry_value → profit=0 nunca é LOSS.
                             is_win = None
-                            _order_not_executed = True
                             logging.error(
-                                "bot_runner: ordem não executou na corretora (saldo inalterado) | ativo=%s saldo_antes=%.2f saldo_depois=%.2f — operação ignorada",
+                                "bot_runner: saldo inalterado após ordem | ativo=%s saldo_antes=%.2f saldo_depois=%.2f -> EMPATE/não executada",
                                 used_active, float(balance_before), float(balance_after),
                             )
                         else:
@@ -2037,13 +2036,7 @@ def _run_bot(token: str, s, config: dict) -> None:
 
                 # Atualiza a operação que já está na lista (estava "pending") com o resultado final.
                 if operations and operations[-1].get("result") == "pending" and operations[-1].get("id") == op_id:
-                    if _order_not_executed:
-                        # Ordem não foi executada na corretora — remove do histórico
-                        operations.pop()
-                        mg_level = 0  # reseta martingale pois nada foi operado
-                        last_processed_bucket = minute_bucket
-                        continue
-                    elif is_win is None:
+                    if is_win is None:
                         operations[-1]["result"] = "draw"
                         operations[-1]["profit"] = 0.0
                     else:
