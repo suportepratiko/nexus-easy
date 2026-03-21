@@ -3,6 +3,31 @@ import { getPushVapidPublic, savePushSubscription } from "@/lib/api/pwa";
 
 export type PushStatus = "unsupported" | "prompt" | "granted" | "denied" | "subscribed" | "error";
 
+/** Garante que o SW está registrado e ativo. Registra se necessário. */
+async function ensureServiceWorker(): Promise<ServiceWorkerRegistration | null> {
+  if (!("serviceWorker" in navigator)) return null;
+  // Se já existe um registration ativo, usa ele
+  const existing = await navigator.serviceWorker.getRegistration("/");
+  if (existing?.active) return existing;
+  // Caso contrário, registra (fallback — o vite-plugin-pwa também registra)
+  try {
+    const reg = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
+    // Espera ficar ativo (pode levar alguns ms na primeira vez)
+    if (reg.active) return reg;
+    return new Promise<ServiceWorkerRegistration>((resolve) => {
+      const sw = reg.installing || reg.waiting;
+      if (!sw) { resolve(reg); return; }
+      sw.addEventListener("statechange", () => {
+        if (sw.state === "activated") resolve(reg);
+      });
+      // Timeout de segurança
+      setTimeout(() => resolve(reg), 5000);
+    });
+  } catch {
+    return null;
+  }
+}
+
 export function usePushNotifications() {
   const [status, setStatus] = useState<PushStatus>("prompt");
   const [error, setError] = useState<string | null>(null);
@@ -19,8 +44,9 @@ export function usePushNotifications() {
     let cancelled = false;
     (async () => {
       try {
-        const reg = await navigator.serviceWorker.ready;
-        const sub = await reg?.pushManager?.getSubscription?.();
+        const reg = await ensureServiceWorker();
+        if (!reg || cancelled) return;
+        const sub = await reg.pushManager?.getSubscription?.();
         if (cancelled) return;
         if (Notification.permission === "granted" && sub) {
           setStatus("subscribed");
@@ -34,19 +60,6 @@ export function usePushNotifications() {
     return () => {
       cancelled = true;
     };
-  }, []);
-
-  const registerSw = useCallback(async (): Promise<ServiceWorkerRegistration | null> => {
-    if (!("serviceWorker" in navigator)) return null;
-    try {
-      // Usa o SW já registrado pelo vite-plugin-pwa; não registra um novo
-      const reg = await navigator.serviceWorker.ready;
-      return reg;
-    } catch (e) {
-      setError("Falha ao acessar service worker.");
-      setStatus("error");
-      return null;
-    }
   }, []);
 
   const enable = useCallback(async (onSuccess?: () => void, onError?: (message: string) => void) => {
@@ -66,8 +79,14 @@ export function usePushNotifications() {
       onError?.(msg);
       return;
     }
-    const reg = await registerSw();
-    if (!reg) return;
+    const reg = await ensureServiceWorker();
+    if (!reg) {
+      const msg = "Falha ao registrar service worker.";
+      setError(msg);
+      setStatus("error");
+      onError?.(msg);
+      return;
+    }
     if (permission !== "granted") {
       const result = await Notification.requestPermission();
       if (result !== "granted") {
@@ -94,9 +113,9 @@ export function usePushNotifications() {
       setStatus("error");
       onError?.(msg);
     }
-  }, [registerSw]);
+  }, []);
 
-  return { status, error, enable, registerSw };
+  return { status, error, enable };
 }
 
 function urlB64ToUint8Array(base64String: string): Uint8Array {

@@ -379,11 +379,9 @@ def platform_login(request: Request, body: PlatformLoginRequest, db: Session = D
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Sua assinatura está vencida. Entre em contato para renovar seu acesso.",
             )
-    # Incrementar token_version: invalida qualquer sessão anterior desta conta (só um login por conta)
-    user.token_version = (getattr(user, "token_version", 0) or 0) + 1
-    db.commit()
-    db.refresh(user)
-    token = create_access_token(user.email, user.role, token_version=user.token_version)
+    # Multi-dispositivo: não invalida sessões anteriores. Todos os tokens com mesma versão funcionam.
+    current_v = getattr(user, "token_version", 0) or 0
+    token = create_access_token(user.email, user.role, token_version=current_v)
     return PlatformLoginResponse(
         token=token,
         user={"email": user.email, "role": user.role},
