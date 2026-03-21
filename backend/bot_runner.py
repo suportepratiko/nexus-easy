@@ -870,14 +870,8 @@ def _run_bot(token: str, s, config: dict) -> None:
     account_mode = str(config.get("accountMode") or "REAL").upper()
     if account_mode not in ("REAL", "PRACTICE"):
         account_mode = "REAL"
-
-    # start_bot já confirmou e setou a conta corretamente antes de iniciar esta thread.
-    # Tenta reconfirmar, mas não aborta se falhar (a conta já está correta).
-    try:
-        s.change_balance(account_mode)
-        logging.info("bot_runner: conta confirmada na thread = %s", account_mode)
-    except Exception as e:
-        logging.warning("bot_runner: reconfirmação de conta falhou (não fatal — conta já foi setada em start_bot): %s", e)
+    logging.info("_run_bot: iniciando thread | token=%s | accountMode=%s", token[:8], account_mode)
+    # NÃO chama change_balance aqui — já foi feito em start_bot. Apenas loga para diagnóstico.
 
     entry_value = float(config.get("entryValue", 10))
     stop_gain_mode = config.get("stopGainMode", "gross_value")
@@ -2246,26 +2240,18 @@ def start_bot(token: str, s, config: dict) -> None:
         account_mode = str(config.get("accountMode") or "REAL").upper()
         if account_mode not in ("REAL", "PRACTICE"):
             account_mode = "REAL"
-
-        # Troca de conta com validação obrigatória — NUNCA silencia erros aqui.
-        # Se a troca falhar, o bot NÃO inicia para evitar operar na conta errada.
+        logging.info("start_bot: accountMode recebido='%s', usando='%s' para token %s", config.get("accountMode"), account_mode, token[:8])
         try:
+            logging.info("start_bot: chamando change_balance('%s') para token %s", account_mode, token[:8])
             s.change_balance(account_mode)
-        except Exception as e:
-            raise RuntimeError(f"Falha ao selecionar conta {account_mode}: {e}") from e
-
-        # Confirma que o saldo obtido corresponde à conta correta
-        try:
+            logging.info("start_bot: change_balance('%s') OK, buscando saldo...", account_mode)
             start_balance = s.get_balance()
+            logging.info("start_bot: saldo obtido = %s (conta %s)", start_balance, account_mode)
             if start_balance is None:
-                raise RuntimeError("get_balance retornou None após change_balance")
+                start_balance = float(config.get("bankroll", 0)) or 0
         except Exception as e:
-            raise RuntimeError(f"Falha ao obter saldo da conta {account_mode}: {e}") from e
-
-        logging.info(
-            "start_bot: conta=%s saldo_inicial=%.2f token=%s",
-            account_mode, start_balance, token[:8]
-        )
+            logging.error("start_bot: ERRO em change_balance/get_balance ('%s'): %s", account_mode, e)
+            raise RuntimeError(f"Falha ao selecionar conta {account_mode}: {e}") from e
         _bot_state[token] = {
             "running": True,
             "_gen": new_gen,
@@ -2278,7 +2264,7 @@ def start_bot(token: str, s, config: dict) -> None:
             "stop_reason": None,
             "error": None,
         }
-        logging.info("start_bot: nova geração %d iniciada para token %s", new_gen, token[:8])
+        logging.info("start_bot: nova geração %d iniciada para token %s | conta=%s | saldo_inicial=%.2f", new_gen, token[:8], account_mode, start_balance)
     t = threading.Thread(target=_run_bot, args=(token, s, config), daemon=True)
     t.start()
 
