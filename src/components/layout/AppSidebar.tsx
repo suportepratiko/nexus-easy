@@ -8,6 +8,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { usePlatformAuth } from "@/contexts/PlatformAuthContext";
 import { formatBrl } from "@/lib/utils";
 import { getBalances, getPlatformToken } from "@/lib/api";
+import { useHideBalance } from "@/contexts/HideBalanceContext";
 import {
   Sidebar,
   SidebarContent,
@@ -90,9 +91,11 @@ export function AppSidebar() {
   }, []);
 
   const displayName = user?.email?.split("@")[0] || "Usuário";
+  const { hideBalance } = useHideBalance();
   const saldoNum = isRunning ? currentBalance : (sidebarBalance ?? (isSafirionConnected ? 0 : null));
-  const saldoTexto =
-    saldoNum !== null && saldoNum > 0
+  const saldoTexto = (isRunning && hideBalance)
+    ? "R$ ••••••"
+    : saldoNum !== null && saldoNum > 0
       ? `R$ ${formatBrl(saldoNum)}`
       : isSafirionConnected
         ? (saldoNum === 0 ? "R$ 0,00" : "—")

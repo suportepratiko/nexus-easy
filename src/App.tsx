@@ -8,6 +8,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { BotProvider } from "@/modules/bot/BotProvider";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { SoundOnOperationProvider } from "@/contexts/SoundOnOperationContext";
+import { HideBalanceProvider } from "@/contexts/HideBalanceContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AdminRoute } from "@/components/AdminRoute";
 import LoginPage from "./pages/Login";
@@ -61,6 +62,7 @@ const App = () => (
                   <AuthProvider>
                     <BotProvider>
                       <SoundOnOperationProvider>
+                      <HideBalanceProvider>
                         <AppLayout>
                           <Routes>
                             <Route path="/" element={<DashboardPage />} />
@@ -81,6 +83,7 @@ const App = () => (
                             <Route path="*" element={<NotFound />} />
                           </Routes>
                         </AppLayout>
+                      </HideBalanceProvider>
                       </SoundOnOperationProvider>
                     </BotProvider>
                   </AuthProvider>

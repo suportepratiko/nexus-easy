@@ -7,10 +7,11 @@ import { InstallAppBanner } from "@/components/InstallAppBanner";
 import { useBot } from "@/modules/bot/BotProvider";
 import { usePlatformAuth } from "@/contexts/PlatformAuthContext";
 import { useSoundOnOperation } from "@/contexts/SoundOnOperationContext";
+import { useHideBalance } from "@/contexts/HideBalanceContext";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { LogOut, Volume2, VolumeX, User, Bell, Shield } from "lucide-react";
+import { LogOut, Volume2, VolumeX, User, Bell, Shield, Eye, EyeOff } from "lucide-react";
 import { BotLiveWidget } from "@/components/BotLiveWidget";
 
 export function AppLayout({ children }: { children: ReactNode }) {
@@ -18,6 +19,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const { status, showLiveWidget, setShowLiveWidget } = useBot();
   const { user, logout } = usePlatformAuth();
   const { soundEnabled, setSoundEnabled } = useSoundOnOperation();
+  const { hideBalance, toggleHideBalance } = useHideBalance();
   const isRunning = status === "running";
 
   const handleLogout = () => {
@@ -42,6 +44,29 @@ export function AppLayout({ children }: { children: ReactNode }) {
             </div>
             <div className="flex items-center gap-2">
               <TooltipProvider delayDuration={300}>
+                {/* Ícone de olho — esconde/mostra saldo, só aparece com robô ligado */}
+                {isRunning && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                        onClick={toggleHideBalance}
+                        aria-label={hideBalance ? "Mostrar saldo" : "Ocultar saldo"}
+                      >
+                        {hideBalance ? (
+                          <EyeOff className="h-4 w-4" aria-hidden />
+                        ) : (
+                          <Eye className="h-4 w-4" aria-hidden />
+                        )}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="text-xs">
+                      {hideBalance ? "Saldo oculto — clique para mostrar" : "Clique para ocultar o saldo"}
+                    </TooltipContent>
+                  </Tooltip>
+                )}
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button

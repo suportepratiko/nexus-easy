@@ -33,6 +33,7 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
+import { useHideBalance } from "@/contexts/HideBalanceContext";
 import { toast } from "sonner";
 import {
   LineChart,
@@ -75,6 +76,7 @@ export default function DashboardPage() {
   const { isAuthenticated: isBrokerConnected } = useAuth();
   const navigate = useNavigate();
   const { status: pushStatus, error: pushError, enable: enablePush } = usePushNotifications();
+  const { hideBalance } = useHideBalance();
   const isRunning = status === "running";
   const isStopped = status === "stopped";
   const stoppedByTarget = isStopped && (stopReason === "stop_gain" || stopReason === "stop_loss");
@@ -188,7 +190,7 @@ export default function DashboardPage() {
   const stats = [
     {
       title: "Saldo Atual",
-      value: `R$ ${formatBrl(currentBalance)}`,
+      value: hideBalance ? "R$ ••••••" : `R$ ${formatBrl(currentBalance)}`,
       icon: DollarSign,
       color: "text-white",
     },
