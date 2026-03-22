@@ -47,15 +47,15 @@ function StatCard({
 }) {
   return (
     <Card className="rounded-xl border border-border bg-card">
-      <CardContent className="p-5">
-        <div className="flex items-start justify-between gap-3">
+      <CardContent className="p-4">
+        <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
-            <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground mb-1">{title}</p>
-            <p className={`text-3xl font-bold tabular-nums ${color}`}>{value}</p>
-            {sub && <p className="text-xs text-muted-foreground mt-1">{sub}</p>}
+            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1 leading-tight">{title}</p>
+            <p className={`text-2xl font-bold tabular-nums leading-none ${color}`}>{value}</p>
+            {sub && <p className="text-[11px] text-muted-foreground mt-1 leading-tight">{sub}</p>}
           </div>
-          <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 ${color}`}>
-            <Icon className={`h-5 w-5 ${pulse ? "animate-pulse" : ""}`} />
+          <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 ${color}`}>
+            <Icon className={`h-4 w-4 ${pulse ? "animate-pulse" : ""}`} />
           </span>
         </div>
       </CardContent>
@@ -138,7 +138,7 @@ export default function AdminMetricsPage() {
       </div>
 
       {/* Cards principais */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-3 lg:grid-cols-6 gap-3">
         <StatCard
           title="Usuários Online"
           value={metrics.online_users}
