@@ -160,14 +160,14 @@ export default function AdminMetricsPage() {
           value={metrics.total_users}
           sub={`${metrics.active_users} ativos`}
           icon={Users}
-          color="text-foreground"
+          color="text-primary"
         />
         <StatCard
           title="Operações Hoje"
           value={metrics.ops_today}
           sub={`${metrics.wins_today}W / ${metrics.losses_today}L`}
           icon={BarChart3}
-          color="text-foreground"
+          color="text-primary"
         />
         <StatCard
           title="Win Rate Hoje"
