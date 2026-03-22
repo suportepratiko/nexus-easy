@@ -3,11 +3,26 @@ import { getPushVapidPublic, savePushSubscription } from "@/lib/api/pwa";
 
 export type PushStatus = "unsupported" | "prompt" | "granted" | "denied" | "subscribed" | "error";
 
+async function _getSW(): Promise<ServiceWorkerRegistration> {
+  const swReady = Promise.race([
+    navigator.serviceWorker.ready,
+    new Promise<never>((_, rej) => setTimeout(() => rej(new Error("SW timeout")), 8000)),
+  ]);
+  try {
+    const regs = await navigator.serviceWorker.getRegistrations();
+    const active = regs.find((r) => r.active);
+    return active ?? await swReady;
+  } catch {
+    return await swReady;
+  }
+}
+
 export function usePushNotifications() {
   const [status, setStatus] = useState<PushStatus>("prompt");
   const [error, setError] = useState<string | null>(null);
 
-  // Estado inicial
+  // Estado inicial + auto-sync: se já tem permissão e subscription válida,
+  // re-salva no banco para garantir que este dispositivo está registrado.
   useEffect(() => {
     if (!("Notification" in window) || !("PushManager" in window)) {
       setStatus("unsupported");
@@ -15,9 +30,18 @@ export function usePushNotifications() {
     }
     if (Notification.permission === "denied") { setStatus("denied"); return; }
     if (Notification.permission === "granted") {
-      navigator.serviceWorker?.ready
-        .then((r) => r.pushManager?.getSubscription())
-        .then((sub) => setStatus(sub ? "subscribed" : "granted"))
+      _getSW()
+        .then((reg) => reg.pushManager?.getSubscription())
+        .then(async (sub) => {
+          if (sub) {
+            // Subscription local válida → re-salva no banco (garante que este
+            // dispositivo continua registrado mesmo após o usuário abrir em outro device)
+            try { await savePushSubscription(sub, navigator.userAgent); } catch { /* silencioso */ }
+            setStatus("subscribed");
+          } else {
+            setStatus("granted");
+          }
+        })
         .catch(() => setStatus("granted"));
     }
   }, []);
@@ -41,30 +65,20 @@ export function usePushNotifications() {
         setStatus("granted");
       }
 
-      // 2) Pega o SW — com timeout pois serviceWorker.ready pode travar indefinidamente
-      const swReady = Promise.race([
-        navigator.serviceWorker.ready,
-        new Promise<never>((_, rej) => setTimeout(() => rej(new Error("SW timeout")), 8000)),
-      ]);
-      // Tenta pegar SW ativo já registrado (mais rápido, evita o timeout)
-      let reg: ServiceWorkerRegistration;
-      try {
-        const regs = await navigator.serviceWorker.getRegistrations();
-        const active = regs.find((r) => r.active);
-        reg = active ?? await swReady;
-      } catch {
-        reg = await swReady;
+      // 2) Pega o SW
+      const reg = await _getSW();
+
+      // 3) Reutiliza subscription existente se possível; só recria se não existir
+      let sub = await reg.pushManager.getSubscription();
+      if (!sub) {
+        const { publicKey } = await getPushVapidPublic();
+        sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: b64ToArray(publicKey.trim()),
+        });
       }
 
-      // 3) Subscribe push
-      const old = await reg.pushManager.getSubscription();
-      if (old) await old.unsubscribe();
-
-      const { publicKey } = await getPushVapidPublic();
-      const sub = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: b64ToArray(publicKey.trim()),
-      });
+      // 4) Sempre re-salva no banco (garante registro atualizado deste dispositivo)
       await savePushSubscription(sub, navigator.userAgent);
       setStatus("subscribed");
       onSuccess?.();
