@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { TrendingUp, Settings, Link2, User, Headphones, Shield, Users, Webhook, Package, Trophy, Sparkles, FileText, Bell, Wrench, Mail, ExternalLink } from "lucide-react";
 import * as LucideIcons from "lucide-react";
+import { getBrandIcon } from "@/lib/brandIcons";
 import { NavLink } from "@/components/NavLink";
 import { useBot } from "@/modules/bot/BotProvider";
 import { useAuth } from "@/contexts/AuthContext";
@@ -41,10 +42,12 @@ const adminNavItems = [
   { title: "Links Extras", url: "/admin/links", icon: Link2 },
 ];
 
-function getExtraIcon(name: string): React.ElementType {
+function getExtraIcon(name: string): { Icon: React.ElementType; color?: string } {
+  const brand = getBrandIcon(name);
+  if (brand.Icon) return { Icon: brand.Icon, color: brand.color ?? undefined };
   const icon = (LucideIcons as Record<string, unknown>)[name];
-  if (typeof icon === "function" || (typeof icon === "object" && icon !== null)) return icon as React.ElementType;
-  return LucideIcons.Link;
+  if (typeof icon === "function" || (typeof icon === "object" && icon !== null)) return { Icon: icon as React.ElementType };
+  return { Icon: LucideIcons.Link };
 }
 
 export function AppSidebar() {
@@ -165,7 +168,7 @@ export function AppSidebar() {
             <SidebarGroupContent>
               <SidebarMenu className="space-y-0.5">
                 {extraLinks.map((item) => {
-                  const Icon = getExtraIcon(item.icon ?? "Link");
+                  const { Icon, color: iconColor } = getExtraIcon(item.icon ?? "Link");
                   return (
                     <SidebarMenuItem key={item.key}>
                       <a
@@ -174,7 +177,7 @@ export function AppSidebar() {
                         rel="noopener noreferrer"
                         className={`w-full flex items-center text-sm text-sidebar-foreground rounded-lg border border-transparent transition-all duration-200 hover:bg-primary/10 hover:text-primary hover:border-primary/20 ${collapsed ? "size-8 justify-center p-2" : "px-4 py-2.5"}`}
                       >
-                        <Icon className={`h-4 w-4 shrink-0 ${collapsed ? "" : "mr-3"}`} />
+                        <Icon className={`h-4 w-4 shrink-0 ${collapsed ? "" : "mr-3"}`} style={iconColor ? { color: iconColor } : undefined} />
                         {!collapsed && (
                           <span className="flex-1 flex items-center justify-between gap-1">
                             {item.label}

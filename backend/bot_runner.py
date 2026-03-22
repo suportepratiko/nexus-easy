@@ -1611,7 +1611,31 @@ def _run_bot(token: str, s, config: dict) -> None:
                     if mg_level > 0:
                         logging.info("bot_runner (Lider): revalidação IGNORADA para martingale mg_level=%d — entrando diretamente.", mg_level)
                     guard_ok = True
-                
+
+                # Martingale: sincroniza entrada para ~1s antes do início da próxima vela M1.
+                # Objetivo: pegar o preço de abertura (ou o mais próximo possível).
+                if guard_ok and mg_level > 0:
+                    _mg_get_ts = getattr(s, "get_server_timestamp", lambda: int(time.time()))
+                    _cur_ts = int(_mg_get_ts())
+                    _next_candle_ts = ((_cur_ts // 60) + 1) * 60
+                    _target_entry_ts = _next_candle_ts - 1  # 1s antes de abrir a vela
+                    _wait_for = _target_entry_ts - _cur_ts
+                    if 0 < _wait_for <= 15:
+                        logging.info(
+                            "bot_runner (Lider): [MARTINGALE] sincronizando com abertura da vela — aguardando %.1fs (alvo: -1s da vela)",
+                            _wait_for,
+                        )
+                        while state.get("running") and state.get("_gen") == my_gen:
+                            _cur_ts = int(_mg_get_ts())
+                            if _cur_ts >= _target_entry_ts:
+                                break
+                            time.sleep(0.05)
+                    else:
+                        logging.info(
+                            "bot_runner (Lider): [MARTINGALE] sem sincronização de vela necessária (wait=%.1fs fora da janela 0-15s)",
+                            _wait_for,
+                        )
+
                 logging.info("bot_runner (Lider): disparando gatilho em %s (segundo=%d) revalidação=%s...",
                     active, int(time.time()) % 60, "OK" if guard_ok else "FALHOU")
                 server_now = int(get_ts_fn())
