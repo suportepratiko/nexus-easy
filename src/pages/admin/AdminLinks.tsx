@@ -59,7 +59,7 @@ const api = {
 function IconPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
-  const { Icon, color } = getLucideIcon(value);
+  const { Icon } = getLucideIcon(value);
   const filtered = AVAILABLE_ICONS.filter((n) => n.toLowerCase().includes(search.toLowerCase()));
 
   return (
@@ -69,7 +69,7 @@ function IconPicker({ value, onChange }: { value: string; onChange: (v: string) 
         onClick={() => setOpen((o) => !o)}
         className="flex items-center gap-2 h-9 px-3 rounded-md border border-input bg-background text-sm hover:bg-accent transition-colors w-full"
       >
-        <Icon className="h-4 w-4 shrink-0" style={color ? { color } : undefined} />
+        <Icon className="h-4 w-4 shrink-0" />
         <span className="flex-1 text-left text-muted-foreground">{value}</span>
         <LucideIcons.ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
       </button>
@@ -84,7 +84,7 @@ function IconPicker({ value, onChange }: { value: string; onChange: (v: string) 
           />
           <div className="grid grid-cols-6 gap-1 max-h-48 overflow-y-auto">
             {filtered.map((name) => {
-              const { Icon: I, color: c } = getLucideIcon(name);
+              const { Icon: I } = getLucideIcon(name);
               return (
                 <button
                   key={name}
@@ -93,7 +93,7 @@ function IconPicker({ value, onChange }: { value: string; onChange: (v: string) 
                   onClick={() => { onChange(name); setOpen(false); setSearch(""); }}
                   className={`flex items-center justify-center rounded-lg p-2 transition-colors hover:bg-primary/10 ${value === name ? "bg-primary/15" : "text-muted-foreground"}`}
                 >
-                  <I className="h-4 w-4" style={c ? { color: c } : undefined} />
+                  <I className="h-4 w-4" />
                 </button>
               );
             })}
