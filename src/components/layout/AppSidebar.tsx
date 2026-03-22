@@ -177,7 +177,7 @@ export function AppSidebar() {
                         rel="noopener noreferrer"
                         className={`w-full flex items-center text-sm text-sidebar-foreground rounded-lg border border-transparent transition-all duration-200 hover:bg-primary/10 hover:text-primary hover:border-primary/20 ${collapsed ? "size-8 justify-center p-2" : "px-4 py-2.5"}`}
                       >
-                        <Icon className={`h-4 w-4 shrink-0 ${collapsed ? "" : "mr-3"}`} style={iconColor ? { color: iconColor } : undefined} />
+                        <Icon className={`h-4 w-4 shrink-0 ${collapsed ? "" : "mr-3"}`} />
                         {!collapsed && (
                           <span className="flex-1 flex items-center justify-between gap-1">
                             {item.label}
