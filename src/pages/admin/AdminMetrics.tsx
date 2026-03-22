@@ -110,7 +110,7 @@ export default function AdminMetricsPage() {
   const profitSign = metrics.profit_today >= 0 ? "+" : "";
 
   return (
-    <div className="p-6 space-y-6 max-w-5xl mx-auto">
+    <div className="p-6 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="space-y-0.5">
@@ -240,26 +240,30 @@ export default function AdminMetricsPage() {
           <Wifi className="h-4 w-4" />
           Usuários online agora ({metrics.online_users})
         </h2>
-        {metrics.online_emails.length === 0 ? (
-          <Card className="rounded-xl border border-border">
+        <Card className="rounded-xl border border-border">
+          {metrics.online_emails.length === 0 ? (
             <CardContent className="p-6 text-center text-sm text-muted-foreground">
               Nenhum usuário online no momento.
             </CardContent>
-          </Card>
-        ) : (
-          <Card className="rounded-xl border border-border">
-            <CardContent className="p-4">
-              <div className="flex flex-wrap gap-2">
-                {metrics.online_emails.map((email) => (
-                  <div key={email} className="flex items-center gap-1.5 rounded-lg bg-green-500/10 border border-green-500/20 px-2.5 py-1">
-                    <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
-                    <span className="text-xs text-green-500 font-medium">{email}</span>
+          ) : (
+            <CardContent className="p-0">
+              <div className="divide-y divide-border">
+                {metrics.online_emails.slice(0, 10).map((email, i) => (
+                  <div key={email} className="flex items-center gap-3 px-4 py-2.5">
+                    <span className="text-xs text-muted-foreground w-5 shrink-0 tabular-nums">{i + 1}</span>
+                    <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse shrink-0" />
+                    <span className="text-sm text-foreground">{email}</span>
                   </div>
                 ))}
+                {metrics.online_emails.length > 10 && (
+                  <div className="px-4 py-2.5 text-xs text-muted-foreground">
+                    +{metrics.online_emails.length - 10} outros online
+                  </div>
+                )}
               </div>
             </CardContent>
-          </Card>
-        )}
+          )}
+        </Card>
       </div>
     </div>
   );
