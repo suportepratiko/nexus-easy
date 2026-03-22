@@ -3399,6 +3399,23 @@ def admin_update_extra_link(
     return {"key": link.key, "label": link.label, "url": link.url, "icon": link.icon, "is_active": link.is_active}
 
 
+class ExtraLinkReorder(BaseModel):
+    keys: list[str]  # lista de keys na nova ordem desejada
+
+
+@app.post("/api/platform/admin/extra-links/reorder")
+def admin_reorder_extra_links(
+    body: ExtraLinkReorder,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(get_current_admin),
+):
+    """Reordena os links extras. 'keys' deve conter todas as keys na nova ordem."""
+    for idx, key in enumerate(body.keys):
+        db.query(ExtraLink).filter(ExtraLink.key == key).update({"sort_order": idx})
+    db.commit()
+    return {"ok": True}
+
+
 @app.delete("/api/platform/admin/extra-links/{key}", status_code=204)
 def admin_delete_extra_link(
     key: str,

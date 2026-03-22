@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as LucideIcons from "lucide-react";
-import { ExternalLink, Link2, Loader2, Save, Plus, Trash2, Pencil, X, Check } from "lucide-react";
+import { ExternalLink, Link2, Loader2, Save, Plus, Trash2, Pencil, X, Check, GripVertical } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -54,6 +54,8 @@ const api = {
     fetch(`/api/platform/admin/extra-links/${key}`, { method: "PATCH", headers: api.headers(), body: JSON.stringify(data) }).then((r) => { if (!r.ok) throw new Error(); return r.json(); }),
   remove: (key: string) =>
     fetch(`/api/platform/admin/extra-links/${key}`, { method: "DELETE", headers: api.headers() }).then((r) => { if (!r.ok) throw new Error(); }),
+  reorder: (keys: string[]) =>
+    fetch("/api/platform/admin/extra-links/reorder", { method: "POST", headers: api.headers(), body: JSON.stringify({ keys }) }).then((r) => { if (!r.ok) throw new Error(); }),
 };
 
 function IconPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
@@ -115,10 +117,12 @@ function LinkCard({
   link,
   onSaved,
   onDeleted,
+  dragHandleProps,
 }: {
   link: ExtraLink;
   onSaved: (updated: ExtraLink) => void;
   onDeleted: (key: string) => void;
+  dragHandleProps?: React.HTMLAttributes<HTMLDivElement>;
 }) {
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState<LinkFormState>({ label: link.label, url: link.url, icon: link.icon, is_active: link.is_active });
@@ -160,6 +164,12 @@ function LinkCard({
       <CardContent className="p-4">
         {!editing ? (
           <div className="flex items-center gap-3">
+            <div
+              {...dragHandleProps}
+              className="cursor-grab active:cursor-grabbing text-muted-foreground/40 hover:text-muted-foreground transition-colors shrink-0 touch-none"
+            >
+              <GripVertical className="h-4 w-4" />
+            </div>
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
               <Icon className="h-4 w-4" style={iconColor ? { color: iconColor } : { color: "hsl(var(--primary))" }} />
             </span>
@@ -290,6 +300,8 @@ export default function AdminLinksPage() {
   const { user } = usePlatformAuth();
   const [links, setLinks] = useState<ExtraLink[]>([]);
   const [loading, setLoading] = useState(true);
+  const dragIndexRef = useRef<number | null>(null);
+  const [dragOver, setDragOver] = useState<number | null>(null);
 
   if (!user || user.role !== "admin") return <Navigate to="/" replace />;
 
@@ -299,6 +311,35 @@ export default function AdminLinksPage() {
       .catch(() => toast.error("Erro ao carregar links"))
       .finally(() => setLoading(false));
   }, []);
+
+  const handleDragStart = (index: number) => {
+    dragIndexRef.current = index;
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    setDragOver(index);
+  };
+
+  const handleDrop = async (dropIndex: number) => {
+    const dragIndex = dragIndexRef.current;
+    if (dragIndex === null || dragIndex === dropIndex) {
+      setDragOver(null);
+      dragIndexRef.current = null;
+      return;
+    }
+    const reordered = [...links];
+    const [moved] = reordered.splice(dragIndex, 1);
+    reordered.splice(dropIndex, 0, moved);
+    setLinks(reordered);
+    setDragOver(null);
+    dragIndexRef.current = null;
+    try {
+      await api.reorder(reordered.map((l) => l.key));
+    } catch {
+      toast.error("Falha ao salvar nova ordem.");
+    }
+  };
 
   if (loading) {
     return (
@@ -313,7 +354,7 @@ export default function AdminLinksPage() {
       <div className="space-y-1">
         <h1 className="text-xl font-bold">Links Extras</h1>
         <p className="text-sm text-muted-foreground">
-          Gerencie os links da seção <span className="font-medium text-foreground">Extras</span> na sidebar dos usuários. Cada link abre em nova aba.
+          Gerencie os links da seção <span className="font-medium text-foreground">Extras</span> na sidebar dos usuários. Arraste para reordenar.
         </p>
       </div>
 
@@ -321,13 +362,24 @@ export default function AdminLinksPage() {
         {links.length === 0 && (
           <p className="text-sm text-muted-foreground text-center py-6">Nenhum link cadastrado ainda.</p>
         )}
-        {links.map((link) => (
-          <LinkCard
+        {links.map((link, index) => (
+          <div
             key={link.key}
-            link={link}
-            onSaved={(updated) => setLinks((prev) => prev.map((l) => l.key === updated.key ? updated : l))}
-            onDeleted={(key) => setLinks((prev) => prev.filter((l) => l.key !== key))}
-          />
+            draggable
+            onDragStart={() => handleDragStart(index)}
+            onDragOver={(e) => handleDragOver(e, index)}
+            onDragLeave={() => setDragOver(null)}
+            onDrop={() => handleDrop(index)}
+            onDragEnd={() => { setDragOver(null); dragIndexRef.current = null; }}
+            className={`transition-all duration-150 rounded-xl ${dragOver === index && dragIndexRef.current !== index ? "ring-2 ring-primary/50 scale-[1.01]" : ""}`}
+          >
+            <LinkCard
+              link={link}
+              onSaved={(updated) => setLinks((prev) => prev.map((l) => l.key === updated.key ? updated : l))}
+              onDeleted={(key) => setLinks((prev) => prev.filter((l) => l.key !== key))}
+              dragHandleProps={{}}
+            />
+          </div>
         ))}
         <NewLinkForm onCreated={(created) => setLinks((prev) => [...prev, created])} />
       </div>
