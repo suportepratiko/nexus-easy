@@ -13,8 +13,10 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { LogOut, Volume2, VolumeX, User, Bell, Shield, Eye, EyeOff } from "lucide-react";
 import { BotLiveWidget } from "@/components/BotLiveWidget";
+import { useHeartbeat } from "@/hooks/useHeartbeat";
 
 export function AppLayout({ children }: { children: ReactNode }) {
+  useHeartbeat();
   const navigate = useNavigate();
   const { status, showLiveWidget, setShowLiveWidget } = useBot();
   const { user, logout } = usePlatformAuth();

@@ -290,6 +290,19 @@ class BrokerSessionsManager:
             except Exception:
                 pass
 
+    def get_all_sessions(self) -> list[dict]:
+        """Retorna lista de sessões ativas com email e status do processo."""
+        with self._lock:
+            return [
+                {
+                    "token": token,
+                    "email": h.email,
+                    "alive": h.process.is_alive(),
+                    "platform_user_id": h.platform_user_id,
+                }
+                for token, h in self._sessions.items()
+            ]
+
     def close_all(self) -> None:
         with self._lock:
             tokens = list(self._sessions.keys())

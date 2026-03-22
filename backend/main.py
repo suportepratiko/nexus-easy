@@ -518,6 +518,108 @@ def change_password(
     return {"message": "Senha alterada com sucesso."}
 
 
+# ---------- Admin: Métricas em tempo real ----------
+
+# Rastreamento de usuários online via heartbeat (in-memory, sem banco)
+_online_users: dict[str, float] = {}  # email -> último timestamp de heartbeat
+_online_lock = threading.Lock()
+_ONLINE_TIMEOUT_SEC = 90  # usuário considerado offline após 90s sem heartbeat
+
+
+def _cleanup_online_users() -> None:
+    cutoff = time.time() - _ONLINE_TIMEOUT_SEC
+    with _online_lock:
+        stale = [e for e, ts in _online_users.items() if ts < cutoff]
+        for e in stale:
+            del _online_users[e]
+
+
+@app.post("/api/platform/heartbeat")
+def heartbeat(current_user: User = Depends(get_current_user)):
+    """Registra que o usuário está online. Chamado periodicamente pelo frontend."""
+    _cleanup_online_users()
+    with _online_lock:
+        _online_users[current_user.email] = time.time()
+    return {"ok": True}
+
+
+@app.get("/api/platform/admin/metrics")
+def admin_metrics(db: Session = Depends(get_db), _admin: User = Depends(get_current_admin)):
+    """Retorna métricas em tempo real da plataforma."""
+    import time as _time
+
+    _cleanup_online_users()
+
+    # Usuários online
+    with _online_lock:
+        online_emails = list(_online_users.keys())
+    online_count = len(online_emails)
+
+    # Sessões da corretora ativas (usuários conectados à corretora)
+    all_sessions = _broker_sessions.get_all_sessions()
+    broker_sessions_count = sum(1 for s in all_sessions if s["alive"])
+
+    # Robôs rodando (sessões com bot ativo)
+    # Precisamos checar o status do bot em cada sessão de processo ativo
+    running_bots = []
+    for sess in all_sessions:
+        if not sess["alive"]:
+            continue
+        try:
+            result = _broker_sessions.call(sess["token"], "bot_status", timeout_sec=3)
+            if result and result.get("running"):
+                email = sess["email"]
+                # Busca usuário da plataforma pelo email da corretora (broker_email)
+                db_user = db.query(User).filter(User.broker_email == email).first()
+                running_bots.append({
+                    "email": email,
+                    "platform_email": db_user.email if db_user else None,
+                    "account_mode": result.get("account_mode", "REAL"),
+                    "total_profit": round(result.get("total_profit") or 0, 2),
+                    "operations": len(result.get("operations") or []),
+                })
+        except Exception:
+            pass
+
+    # Total de usuários na plataforma
+    total_users = db.query(User).filter(User.role != "admin").count()
+    active_users = db.query(User).filter(User.role != "admin", User.is_active == True).count()
+
+    # Operações de hoje
+    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    ops_today = db.query(UserOperation).filter(UserOperation.timestamp >= today_start).count()
+    wins_today = db.query(UserOperation).filter(
+        UserOperation.timestamp >= today_start,
+        UserOperation.result == "win",
+    ).count()
+    losses_today = db.query(UserOperation).filter(
+        UserOperation.timestamp >= today_start,
+        UserOperation.result == "loss",
+    ).count()
+
+    # Lucro total hoje
+    from sqlalchemy import func as sqlfunc
+    profit_today_row = db.query(sqlfunc.sum(UserOperation.profit)).filter(
+        UserOperation.timestamp >= today_start
+    ).scalar()
+    profit_today = round(float(profit_today_row or 0), 2)
+
+    return {
+        "online_users": online_count,
+        "online_emails": online_emails,
+        "broker_sessions": broker_sessions_count,
+        "running_bots": len(running_bots),
+        "running_bots_detail": running_bots,
+        "total_users": total_users,
+        "active_users": active_users,
+        "ops_today": ops_today,
+        "wins_today": wins_today,
+        "losses_today": losses_today,
+        "profit_today": profit_today,
+        "win_rate_today": round(wins_today / ops_today * 100, 1) if ops_today > 0 else 0,
+    }
+
+
 # ---------- Admin (apenas role=admin) ----------
 
 def _serialize_dt(dt: datetime | None) -> str | None:

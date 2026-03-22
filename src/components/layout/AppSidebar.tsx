@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
-import { TrendingUp, Settings, Link2, User, Headphones, Shield, Users, Webhook, Package, Trophy, Sparkles, FileText, Bell, Wrench, Mail, ExternalLink } from "lucide-react";
+import { TrendingUp, Settings, Link2, User, Headphones, Shield, Users, Webhook, Package, Trophy, Sparkles, FileText, Bell, Wrench, Mail, ExternalLink, Activity } from "lucide-react";
 import * as LucideIcons from "lucide-react";
 import { getBrandIcon } from "@/lib/brandIcons";
 import { NavLink } from "@/components/NavLink";
@@ -40,6 +40,7 @@ const adminNavItems = [
   { title: "Notificações PWA", url: "/admin/notificacoes-pwa", icon: Bell },
   { title: "Email Marketing", url: "/admin/email", icon: Mail },
   { title: "Links Extras", url: "/admin/links", icon: Link2 },
+  { title: "Métricas", url: "/admin/metricas", icon: Activity },
 ];
 
 function getExtraIcon(name: string): { Icon: React.ElementType; color?: string } {
