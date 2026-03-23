@@ -47,9 +47,36 @@ def _worker(session_token: str, login_email: str, password: str, conn: Connectio
     try:
         from safirionapi.stable_api import Safirion
         from backend import bot_runner
+        import os, random
+
+        # Lógica de proxy dinâmico para evitar "The number of requests has been exceeded" (rate limits baseados em IP).
+        proxy_dict = None
+        proxy_file = "/app/proxies.txt"
+        
+        try:
+            if os.path.exists(proxy_file):
+                with open(proxy_file, "r") as f:
+                    proxy_list = [line.strip() for line in f if line.strip()]
+                
+                if proxy_list:
+                    chosen_proxy = random.choice(proxy_list)
+                    parts = chosen_proxy.split(":")
+                    if len(parts) == 4 and not chosen_proxy.startswith("http"):
+                        # Formato ip:port:user:pass
+                        ip, port, user, pwd = parts
+                        chosen_proxy = f"http://{user}:{pwd}@{ip}:{port}"
+                    elif not chosen_proxy.startswith("http"):
+                        # Formato ip:port
+                        chosen_proxy = f"http://{chosen_proxy}"
+                        ip = chosen_proxy
+                        
+                    proxy_dict = {"http": chosen_proxy, "https": chosen_proxy}
+                    print(f"\n🚀 [SAFIRION-PROXY] Conectando API para {login_email} (Via IP: {ip})\n", flush=True)
+        except Exception as e:
+            print(f"\n⚠️ [SAFIRION-PROXY] Erro ao carregar proxies: {e}\n", flush=True)
 
         typed_email = (login_email or "").strip().lower()
-        s = Safirion(login_email, password)
+        s = Safirion(login_email, password, proxies=proxy_dict)
         ok, reason = s.connect()
         if not ok:
             reason_str = str(reason or "")
