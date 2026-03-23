@@ -15,7 +15,9 @@ if ("serviceWorker" in navigator) {
   });
 
   navigator.serviceWorker.ready.then((reg) => {
-    // Verifica por atualizações a cada 60 segundos enquanto o app está aberto
+    // Verifica imediatamente ao abrir o app
+    reg.update();
+    // E continua verificando a cada 60 segundos enquanto o app está aberto
     setInterval(() => reg.update(), 60_000);
 
     reg.addEventListener("updatefound", () => {
