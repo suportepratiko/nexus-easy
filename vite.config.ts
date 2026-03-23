@@ -56,8 +56,8 @@ export default defineConfig(({ mode }) => ({
       strategies: "injectManifest",
       srcDir: "src",
       filename: "sw.js",
-      registerType: "autoUpdate",
-      injectRegister: "auto",
+      registerType: "prompt",
+      injectRegister: null,
       injectManifest: {
         // Arquivos a pré-cachear
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
