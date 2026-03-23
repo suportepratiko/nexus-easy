@@ -66,7 +66,7 @@ function StatCard({
 export default function AdminMetricsPage() {
   const { user } = usePlatformAuth();
   const [metrics, setMetrics] = useState<Metrics | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -92,19 +92,15 @@ export default function AdminMetricsPage() {
 
   useEffect(() => {
     fetchMetrics();
-    const id = setInterval(() => fetchMetrics(true), 15_000);
-    return () => clearInterval(id);
   }, [fetchMetrics]);
 
-  if (loading) {
+  if (!metrics) {
     return (
       <div className="flex items-center justify-center min-h-[40vh] gap-2 text-muted-foreground">
         <RefreshCw className="h-5 w-5 animate-spin" /><span>Carregando métricas…</span>
       </div>
     );
   }
-
-  if (!metrics) return null;
 
   const profitColor = metrics.profit_today >= 0 ? "text-green-500" : "text-red-500";
   const profitSign = metrics.profit_today >= 0 ? "+" : "";
@@ -119,7 +115,7 @@ export default function AdminMetricsPage() {
             Métricas em Tempo Real
           </h1>
           <p className="text-sm text-muted-foreground">
-            Atualiza automaticamente a cada 15s
+            Clique em Atualizar para recarregar os dados
             {lastUpdate && (
               <span className="ml-2 text-[11px]">
                 — última atualização: {lastUpdate.toLocaleTimeString("pt-BR")}

@@ -1612,12 +1612,13 @@ def _run_bot(token: str, s, config: dict) -> None:
                         logging.info("bot_runner (Lider): revalidação IGNORADA para martingale mg_level=%d — entrando diretamente.", mg_level)
                     guard_ok = True
 
-                # Martingale: sincroniza entrada para ~1s antes do início da próxima vela M1.
+                # Martingale: sincroniza entrada para ~1s antes do início da próxima vela (M1 ou M5).
                 # Objetivo: pegar o preço de abertura (ou o mais próximo possível).
                 if guard_ok and mg_level > 0:
                     _mg_get_ts = getattr(s, "get_server_timestamp", lambda: int(time.time()))
                     _cur_ts = int(_mg_get_ts())
-                    _next_candle_ts = ((_cur_ts // 60) + 1) * 60
+                    _mg_bucket_sec = 300 if current_duration >= 5 else 60
+                    _next_candle_ts = ((_cur_ts // _mg_bucket_sec) + 1) * _mg_bucket_sec
                     _target_entry_ts = _next_candle_ts - 1  # 1s antes de abrir a vela
                     _wait_for = _target_entry_ts - _cur_ts
                     if 0 < _wait_for <= 15:
@@ -1727,8 +1728,13 @@ def _run_bot(token: str, s, config: dict) -> None:
                 # Aplica para TODAS as estratégias (built-in e customizadas)
                 price_guard_ok = True
                 try:
-                    # Para M5, também usa snapshot M1 (preço atual é o mesmo)
-                    snapshot = _get_current_m1_snapshot(active)
+                    # Martingale (mg_level > 0): pula snapshot/get_candles completamente.
+                    # A direção já foi validada no sinal original. Chamar get_candles na virada
+                    # da vela pode causar timeout de 15s na API da corretora, bloqueando a entrada.
+                    if mg_level > 0:
+                        snapshot = None
+                    else:
+                        snapshot = _get_current_m1_snapshot(active)
                     if snapshot:
                         candle_from, candle_open, market_price = snapshot
                         price_guard_ok = _is_valid_open_price_guard(direction, candle_open, market_price)
@@ -2149,6 +2155,45 @@ def _run_bot(token: str, s, config: dict) -> None:
                 (current_active or {}).get("name") if current_active else None,
                 last_processed_bucket,
             )
+
+            # PRÉ-SINCRONIZAÇÃO DO MARTINGALE (M1 e M5):
+            # Objetivo: entrar o mais próximo possível da abertura da vela do gale.
+            #
+            # Regra:
+            #   - Se ainda estamos nos primeiros 12s da vela atual → entra JÁ (vela ainda nova)
+            #   - Caso contrário → dorme até 1s antes da PRÓXIMA vela (segundo 59 do minuto)
+            #
+            # Isso evita o bug de "pular vela": se resultado chegou no segundo 3,
+            # entrar agora (na vela atual) em vez de esperar mais 57s pela seguinte.
+            if mg_level > 0 and is_win is False and state.get("running"):
+                _mg_ts_fn = getattr(s, "get_server_timestamp", lambda: int(time.time()))
+                _now_ts = int(_mg_ts_fn())
+                _bucket_sec = 300 if current_duration >= 5 else 60
+                _sec_in_bucket = _now_ts % _bucket_sec
+                _EARLY_THRESHOLD = 12  # segundos: ainda vale entrar na vela atual
+
+                if _sec_in_bucket <= _EARLY_THRESHOLD:
+                    # Ainda no início da vela atual — entra imediatamente
+                    logging.info(
+                        "bot_runner: [MARTINGALE] resultado chegou cedo (seg=%d/%d) — "
+                        "entrando na vela atual sem espera",
+                        _sec_in_bucket, _bucket_sec,
+                    )
+                else:
+                    # Passamos do momento ideal — aguarda abertura da próxima vela (-1s)
+                    _next_candle_open = ((_now_ts // _bucket_sec) + 1) * _bucket_sec
+                    _target_presync_ts = _next_candle_open - 1
+                    _wait_mg = _target_presync_ts - _now_ts
+                    logging.info(
+                        "bot_runner: [MARTINGALE] pré-sincronizando para -1s da próxima vela %s | "
+                        "aguardando %.1fs (seg_atual=%d/%d)",
+                        "M5" if _bucket_sec == 300 else "M1",
+                        _wait_mg, _sec_in_bucket, _bucket_sec,
+                    )
+                    while state.get("running") and state.get("_gen") == my_gen:
+                        if int(_mg_ts_fn()) >= _target_presync_ts:
+                            break
+                        time.sleep(0.05)
 
             # Se o ciclo foi concluído (win em qualquer nível OU loss final), incrementa contador de entradas.
             if entry_finished:
