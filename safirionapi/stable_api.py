@@ -32,6 +32,7 @@ class Safirion:
                      3600, 7200, 14400, 28800, 43200, 86400, 604800, 2592000]
         self.email = email
         self.password = password
+        self.proxies = proxies
         self.suspend = 0.5
         self.thread = None
         self.subscribe_candle = []
@@ -90,7 +91,7 @@ class Safirion:
         import os
         safirion_host = os.environ.get("SAFIRION_HOST", "ws.trade.safirion.com")
         self.api = Safirionapi(
-            safirion_host, self.email, self.password)
+            safirion_host, self.email, self.password, proxies=self.proxies)
         check = None
 
         # 2FA--
