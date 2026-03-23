@@ -60,46 +60,19 @@ function translateBrokerError(msg: string | null | undefined): string {
  */
 export function SafirionConnectCard() {
   const navigate = useNavigate();
-  const { isAuthenticated, login, logout, reconnect, setTokenExpired, error, loading } = useAuth();
+  const { isAuthenticated, login, logout, setTokenExpired, error, loading } = useAuth();
   const { resetBot } = useBot();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(true);
-  // true enquanto tentamos o auto-reconnect na primeira carga (novo dispositivo)
-  // Usa sessionStorage para não repetir após desconect manual na mesma sessão.
-  const [autoConnecting, setAutoConnecting] = useState(
-    () => !isAuthenticated && !sessionStorage.getItem("broker_auto_tried")
-  );
 
-  // Ao montar sem token E sem tentativa prévia, tenta reconectar automaticamente.
-  // Se o usuário desconectou manualmente (logout apagou a senha + marca a flag),
-  // o auto-reconnect não roda e o formulário é exibido direto.
-  useEffect(() => {
-    if (isAuthenticated) { setAutoConnecting(false); return; }
-    if (sessionStorage.getItem("broker_auto_tried")) { setAutoConnecting(false); return; }
-    sessionStorage.setItem("broker_auto_tried", "1");
-    let cancelled = false;
-    reconnect()
-      .catch(() => { /* sem credenciais salvas → exibe formulário */ })
-      .finally(() => { if (!cancelled) setAutoConnecting(false); });
-    return () => { cancelled = true; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Se o token expirou (401), tenta reconectar automaticamente com credenciais salvas no backend.
-  // Só desloga se a reconexão também falhar.
+  // Se o token expirou (401), desloga e exibe o formulário.
   useEffect(() => {
     if (!isAuthenticated) return;
-    getBotStatus().catch(async (e: any) => {
-      if (e?.status === 401) {
-        try {
-          await reconnect();
-        } catch {
-          if (setTokenExpired) setTokenExpired();
-        }
-      }
+    getBotStatus().catch((e: any) => {
+      if (e?.status === 401 && setTokenExpired) setTokenExpired();
     });
-  }, [isAuthenticated, reconnect, setTokenExpired]);
+  }, [isAuthenticated, setTokenExpired]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -114,25 +87,13 @@ export function SafirionConnectCard() {
   };
 
   const handleLogout = async () => {
-    // Marca que o usuário desconectou manualmente — impede o auto-reconnect
+    // Desloga manualmente
     sessionStorage.setItem("broker_auto_tried", "1");
     // 1. Mata WS, para robô no backend e zera estado local
     resetBot();
     // 2. Desloga da corretora (também apaga senha salva no servidor)
     await logout();
   };
-
-  // Estado: tentando reconectar automaticamente (novo dispositivo)
-  if (autoConnecting) {
-    return (
-      <Card className="rounded-xl border border-border bg-card animate-fade-in">
-        <CardContent className="flex flex-col items-center justify-center gap-3 py-10">
-          <Loader2 className="h-7 w-7 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground">Conectando à corretora…</p>
-        </CardContent>
-      </Card>
-    );
-  }
 
   // Estado: já conectado — tema escuro, destaque verde
   if (isAuthenticated) {

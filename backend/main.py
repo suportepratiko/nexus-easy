@@ -1128,7 +1128,9 @@ def login(request: Request, body: LoginRequest, db: Session = Depends(get_db)):
 
 
 @app.post("/api/auth/reconnect", response_model=LoginResponse)
-def reconnect(current_user: User = Depends(get_current_user)):
+def reconnect(current_user: User = Depends(get_current_user)):  # noqa: kept for backwards compat but disabled
+    raise HTTPException(status_code=410, detail="Auto-reconnect desativado. Faça login manualmente na corretora.")
+async def _reconnect_disabled(current_user: User = Depends(get_current_user)):
     """Tenta conectar na corretora usando as credenciais salvas no banco de dados."""
     import random as _random, time as _time
     if not current_user.broker_email or not current_user.broker_password:
