@@ -13,6 +13,7 @@ export type RuleType =
   | "candle_body"
   | "candle_compare"
   | "candle_color"
+  | "candle_sequence"
   | "engulfment"
   | "bollinger"
   | "wick_size"
@@ -34,6 +35,7 @@ export interface EngulfmentParams { bullish: boolean; }
 export interface WickSizeParams { side: "upper" | "lower"; compareType: "body_ratio" | "larger_than_previous"; ratio: number; }
 export interface BreakoutParams { period: number; boundary: "high" | "low"; }
 export interface ConsecutiveParams { count: number; green: boolean; }
+export interface CandleSequenceParams { sequence: boolean[]; } // true=verde, false=vermelha, da mais antiga para mais recente
 export interface MaCompareParams {
   maType: "ema" | "sma";
   period: number;
@@ -47,7 +49,7 @@ export interface MaCompareParams {
 export type RuleParams =
   | RsiParams | EmaSmaCrossParams | MacdParams | CandleCompareParams
   | BollingerParams | CandleColorParams | EngulfmentParams | WickSizeParams
-  | BreakoutParams | ConsecutiveParams | MaCompareParams | Record<string, never>;
+  | BreakoutParams | ConsecutiveParams | MaCompareParams | CandleSequenceParams | Record<string, never>;
 
 export interface StrategyRule {
   id: string;
@@ -66,7 +68,7 @@ export interface ManualStrategyConfig {
 
 const INDICATOR_MIN_CANDLES: Record<RuleType, number> = {
   rsi: 20, ema_cross: 30, sma_cross: 30, macd: 50,
-  candle_body: 5, candle_compare: 15, candle_color: 10,
+  candle_body: 5, candle_compare: 15, candle_color: 10, candle_sequence: 10,
   engulfment: 5, bollinger: 30, wick_size: 10,
   breakout: 50, consecutive: 20, ma_compare: 50,
 };
@@ -197,6 +199,17 @@ function buildCondition(rule: StrategyRule): string | null {
       const idx = Math.max(0, Math.min(10, p.candleIndex ?? 0));
       const op = p.green ? ">" : "<";
       return `closes[-1 - ${idx}] ${op} opens[-1 - ${idx}]`;
+    }
+    case "candle_sequence": {
+      const seq: boolean[] = (p.sequence && p.sequence.length > 0) ? p.sequence : [true];
+      const n = seq.length;
+      // seq[0] = mais antiga, seq[n-1] = mais recente (última fechada)
+      const conditions = seq.map((green: boolean, i: number) => {
+        const offset = n - i; // n=mais antiga, 1=mais recente
+        const op = green ? ">" : "<";
+        return `closes[-${offset}] ${op} opens[-${offset}]`;
+      });
+      return conditions.join(" and ");
     }
     case "engulfment":
       if (p.bullish) {
@@ -337,6 +350,10 @@ function ruleShortLabel(rule: StrategyRule): string {
     case "candle_compare": return `Preço ${PRICE_TYPE_LABELS[p.priceType as CandlePriceType]} vs [${p.barsAgo}]`;
     case "bollinger": return "Extremo de Bollinger";
     case "candle_color": return "Cor específica";
+    case "candle_sequence": {
+      const seq: boolean[] = p.sequence ?? [];
+      return seq.map((g: boolean) => g ? "🟢" : "🔴").join(" › ") || "Sequência de cores";
+    }
     case "engulfment": return "Padrão Engolfo";
     case "wick_size": return `Pavio Longo (${(p.side as string) === "upper" ? "superior" : "inferior"})`;
     case "breakout": return "Rompimento de Máxima/Mínima";
@@ -362,6 +379,7 @@ export const RULE_TYPE_LABELS: Record<RuleType, string> = {
   candle_compare: "Comparar preço atual com vela anterior",
   engulfment:     "Vela engolfo (reversão de tendência)",
   candle_color:   "Cor de uma vela específica atrás",
+  candle_sequence: "Sequência de cores (Ex: 🟢🔴🔴🟢 = entrada)",
   // Indicadores
   rsi:            "RSI — mercado sobrecomprado ou sobrevendido",
   bollinger:      "Bandas de Bollinger — preço saiu do canal",
@@ -379,6 +397,7 @@ export const RULE_TYPE_HINT: Record<RuleType, string> = {
   candle_compare: "Compara o preço atual com o de uma vela anterior. Ex: fechamento atual maior que o de 2 velas atrás.",
   engulfment:     "A vela atual 'engoliu' a anterior inteira. Sinal clássico de reversão usado por traders experientes.",
   candle_color:   "Define qual cor deve ter uma vela específica. Ex: a segunda vela atrás deve ser verde.",
+  candle_sequence: "Monte a sequência exata de cores das velas (da mais antiga para a mais recente). O robô só entra quando essa ordem se confirmar.",
   rsi:            "Indicador que mede se o mercado subiu ou caiu demais. Abaixo de 30 = sobrevendido (call). Acima de 70 = sobrecomprado (put).",
   bollinger:      "Três linhas que formam um canal. Quando o preço toca a banda de fora, tende a voltar ao centro.",
   ema_cross:      "Duas médias móveis exponenciais (rápida e lenta). Quando a rápida cruza a lenta, indica mudança de tendência.",

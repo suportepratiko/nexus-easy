@@ -105,6 +105,11 @@ function ruleToHuman(rule: StrategyRule): string {
       const pos = idx === 0 ? "atual" : `${idx} atrás`;
       return `Vela ${pos} deve ser ${p.green ? "VERDE" : "VERMELHA"}`;
     }
+    case "candle_sequence": {
+      const seq: boolean[] = p.sequence ?? [true];
+      const labels = seq.map((g: boolean) => g ? "VERDE" : "VERMELHA").join(" › ");
+      return `Sequência: ${labels} (${seq.length} velas)`;
+    }
     case "candle_compare": {
       const barsAgo = p.barsAgo ?? 2;
       return `Preço de ${PRICE_TYPE_LABELS[p.priceType as CandlePriceType] ?? "fechamento"} atual ${p.currentGreater ? "maior" : "menor"} que ${barsAgo} vela(s) atrás`;
@@ -169,6 +174,8 @@ function defaultParamsFor(type: RuleType, signal: "call" | "put"): StrategyRule[
       return { ...DEFAULT_BREAKOUT, boundary: signal === "call" ? "high" : "low" };
     case "consecutive":
       return { ...DEFAULT_CONSECUTIVE, green: signal === "call" };
+    case "candle_sequence":
+      return { sequence: signal === "call" ? [false, false, true] : [true, true, false] };
     case "ma_compare":
       return { ...DEFAULT_MA_COMPARE, comparison: signal === "call" ? "above" : "below" };
     default:
@@ -872,7 +879,7 @@ function RuleEditor({
                 <SelectLabel className="text-xs font-bold text-muted-foreground uppercase tracking-wider px-2 py-1.5">
                   Velas
                 </SelectLabel>
-                {(["candle_body", "consecutive", "wick_size", "breakout", "candle_compare", "engulfment", "candle_color"] as RuleType[]).map((t) => (
+                {(["candle_body", "consecutive", "candle_sequence", "wick_size", "breakout", "candle_compare", "engulfment", "candle_color"] as RuleType[]).map((t) => (
                   <SelectItem key={t} value={t} className="py-2.5">
                     {RULE_TYPE_LABELS[t]}
                   </SelectItem>
@@ -1088,6 +1095,9 @@ function RuleEditor({
                   <SelectItem value="1">Vela [1] (anterior)</SelectItem>
                   <SelectItem value="2">Vela [2] (duas atrás)</SelectItem>
                   <SelectItem value="3">Vela [3] (três atrás)</SelectItem>
+                  <SelectItem value="4">Vela [4] (quatro atrás)</SelectItem>
+                  <SelectItem value="5">Vela [5] (cinco atrás)</SelectItem>
+                  <SelectItem value="6">Vela [6] (seis atrás)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -1110,6 +1120,57 @@ function RuleEditor({
             </div>
           </div>
         )}
+
+        {rule.type === "candle_sequence" && (() => {
+          const seq: boolean[] = (params as any).sequence ?? [true];
+          return (
+            <div className="space-y-3">
+              <Label className="text-xs font-medium">
+                Monte a sequência de cores — da mais antiga (esquerda) para a mais recente (direita)
+              </Label>
+              <div className="flex flex-wrap items-center gap-2">
+                {seq.map((green: boolean, i: number) => (
+                  <button
+                    key={i}
+                    type="button"
+                    title={green ? "Verde — clique para trocar" : "Vermelha — clique para trocar"}
+                    onClick={() => {
+                      const next = [...seq];
+                      next[i] = !next[i];
+                      onUpdate({ params: { ...params, sequence: next } });
+                    }}
+                    className={`w-10 h-10 rounded-lg border-2 font-bold text-xs transition-all ${green ? "bg-emerald-600/20 border-emerald-500 text-emerald-400 hover:bg-emerald-600/40" : "bg-red-600/20 border-red-500 text-red-400 hover:bg-red-600/40"}`}
+                  >
+                    {green ? "V" : "R"}
+                  </button>
+                ))}
+                {seq.length < 8 && (
+                  <button
+                    type="button"
+                    title="Adicionar vela à sequência"
+                    onClick={() => onUpdate({ params: { ...params, sequence: [...seq, true] } })}
+                    className="w-10 h-10 rounded-lg border-2 border-dashed border-muted-foreground/40 text-muted-foreground hover:border-primary hover:text-primary transition-all text-lg"
+                  >
+                    +
+                  </button>
+                )}
+                {seq.length > 1 && (
+                  <button
+                    type="button"
+                    title="Remover última vela"
+                    onClick={() => onUpdate({ params: { ...params, sequence: seq.slice(0, -1) } })}
+                    className="w-10 h-10 rounded-lg border-2 border-dashed border-muted-foreground/40 text-muted-foreground hover:border-red-500 hover:text-red-400 transition-all text-lg"
+                  >
+                    −
+                  </button>
+                )}
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Clique em cada vela para alternar entre Verde (V) e Vermelha (R). Sequência atual: <span className="font-mono">{seq.map((g: boolean) => g ? "🟢" : "🔴").join(" › ")}</span>
+              </p>
+            </div>
+          );
+        })()}
 
         {rule.type === "wick_size" && (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
