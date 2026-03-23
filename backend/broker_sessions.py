@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 import threading
 import uuid
@@ -51,11 +52,21 @@ def _worker(session_token: str, login_email: str, password: str, conn: Connectio
         s = Safirion(login_email, password)
         ok, reason = s.connect()
         if not ok:
+            reason_str = str(reason or "")
+            rate_limited = (
+                "number of requests" in reason_str.lower()
+                or "exceeded" in reason_str.lower()
+                or "too many" in reason_str.lower()
+            )
+            if rate_limited:
+                import time as _time
+                _time.sleep(5)  # backoff mínimo antes de responder
             conn.send(
                 {
                     "ok": False,
-                    "error": str(reason or "E-mail ou senha incorretos na corretora."),
+                    "error": reason_str or "E-mail ou senha incorretos na corretora.",
                     "status": 401,
+                    "rate_limited": rate_limited,
                 }
             )
             return
@@ -232,6 +243,8 @@ class BrokerSessionsManager:
         if not init.get("ok"):
             process.terminate()
             msg = str(init.get("error") or "Falha ao autenticar na corretora.")
+            if init.get("rate_limited"):
+                raise RuntimeError(json.dumps({"code": "rate_limited", "message": msg}))
             raise RuntimeError(msg)
 
         resolved_email = str((init.get("data") or {}).get("email") or email).strip().lower()

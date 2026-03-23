@@ -1109,12 +1109,16 @@ def login(request: Request, body: LoginRequest, db: Session = Depends(get_db)):
                 detail = "E-mail ou senha incorretos. Verifique suas credenciais e tente novamente."
             elif code == "account_blocked":
                 detail = "Conta bloqueada. Entre em contato com o suporte da corretora."
-            elif code == "too_many_attempts":
-                detail = "Muitas tentativas. Aguarde alguns minutos e tente novamente."
+            elif code == "too_many_attempts" or code == "rate_limited":
+                detail = "Muitas conexões simultâneas do servidor. Aguarde 60 minutos e tente novamente. Isso ocorre quando vários usuários conectam ao mesmo tempo pelo mesmo servidor."
             else:
                 detail = parsed.get("message") or parsed.get("detail") or "Erro ao conectar na corretora."
         except Exception:
-            detail = "Erro ao conectar na corretora."
+            # Detecta rate limit direto na string bruta
+            if "number of requests" in raw.lower() or "exceeded" in raw.lower():
+                detail = "Muitas conexões simultâneas do servidor. Aguarde 60 minutos e tente novamente."
+            else:
+                detail = "Erro ao conectar na corretora."
         raise HTTPException(status_code=401, detail=detail)
     except HTTPException:
         raise
@@ -1126,12 +1130,21 @@ def login(request: Request, body: LoginRequest, db: Session = Depends(get_db)):
 @app.post("/api/auth/reconnect", response_model=LoginResponse)
 def reconnect(current_user: User = Depends(get_current_user)):
     """Tenta conectar na corretora usando as credenciais salvas no banco de dados."""
+    import random as _random, time as _time
     if not current_user.broker_email or not current_user.broker_password:
         raise HTTPException(status_code=400, detail="Sem credenciais salvas para reconectar.")
-    
+
     if Safirion is None:
         raise HTTPException(status_code=503, detail="Integração Safirion não disponível.")
-    
+
+    # Escalonar reconexões: se há várias sessões ativas, adiciona delay aleatório
+    # para evitar que todos reconectem ao mesmo tempo (rate limit por IP na corretora).
+    active_sessions = len(_broker_sessions._sessions)
+    if active_sessions > 2:
+        delay = min(active_sessions * _random.uniform(0.8, 2.0), 30)
+        logging.info("AUTO-RECONECT: %d sessões ativas — aguardando %.1fs antes de reconectar %s", active_sessions, delay, current_user.broker_email)
+        _time.sleep(delay)
+
     logging.info("Login corretora (AUTO-RECONECT): tentativa para %s", current_user.broker_email)
     try:
         token, resolved_email = _broker_sessions.create_session(
@@ -1141,6 +1154,12 @@ def reconnect(current_user: User = Depends(get_current_user)):
         )
         logging.info("Login corretora (AUTO-RECONECT): OK para %s", current_user.broker_email)
         return LoginResponse(token=token, message="Reconectado com sucesso.")
+    except RuntimeError as e:
+        raw = str(e)
+        logging.warning("Login corretora (AUTO-RECONECT): falhou para %s — %s", current_user.broker_email, raw)
+        if "rate_limited" in raw or "number of requests" in raw.lower() or "exceeded" in raw.lower():
+            raise HTTPException(status_code=429, detail="Muitas conexões simultâneas do servidor. Aguarde alguns minutos e tente reconectar manualmente.")
+        raise HTTPException(status_code=401, detail="Credenciais salvas inválidas ou expiradas.")
     except Exception as e:
         logging.warning("Login corretora (AUTO-RECONECT): falhou para %s — %s", current_user.broker_email, e)
         raise HTTPException(status_code=401, detail="Credenciais salvas inválidas ou expiradas.")
