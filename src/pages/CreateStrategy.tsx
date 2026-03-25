@@ -874,7 +874,13 @@ function RuleEditor({
             <SelectTrigger id={typeId} className="w-full bg-background border-border/70 shadow-none">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent className="max-h-[70vh]">
+            <SelectContent
+              position="popper"
+              side="bottom"
+              align="start"
+              avoidCollisions={true}
+              className="max-h-[60vh] overflow-y-auto w-[var(--radix-select-trigger-width)]"
+            >
               <SelectGroup>
                 <SelectLabel className="text-xs font-bold text-muted-foreground uppercase tracking-wider px-2 py-1.5">
                   Velas
@@ -1027,7 +1033,7 @@ function RuleEditor({
                   <SelectTrigger className="bg-background">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent position="popper" avoidCollisions={true}>
                     {(Object.keys(PRICE_TYPE_LABELS) as CandlePriceType[]).map((k) => (
                       <SelectItem key={k} value={k}>
                         {PRICE_TYPE_LABELS[k]}
@@ -1047,7 +1053,7 @@ function RuleEditor({
                   <SelectTrigger className="bg-background">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent position="popper" avoidCollisions={true}>
                     {[1, 2, 3, 4, 5, 10].map((n) => (
                       <SelectItem key={n} value={String(n)}>
                         Vela [{n}] ({n} {n === 1 ? "atrás" : "atrás"})
@@ -1067,7 +1073,7 @@ function RuleEditor({
                   <SelectTrigger className="bg-background font-medium">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent position="popper" avoidCollisions={true}>
                     <SelectItem value="greater">Deve ser Maior {">"}</SelectItem>
                     <SelectItem value="less">Deve ser Menor {"<"}</SelectItem>
                   </SelectContent>
@@ -1090,7 +1096,7 @@ function RuleEditor({
                 <SelectTrigger className="bg-background">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent position="popper" avoidCollisions={true}>
                   <SelectItem value="0">Vela Atual (em formação)</SelectItem>
                   <SelectItem value="1">Vela [1] (anterior)</SelectItem>
                   <SelectItem value="2">Vela [2] (duas atrás)</SelectItem>
@@ -1112,7 +1118,7 @@ function RuleEditor({
                 <SelectTrigger className="bg-background">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent position="popper" avoidCollisions={true}>
                   <SelectItem value="green" className="text-emerald-600 font-bold">Verde (Vela de Alta)</SelectItem>
                   <SelectItem value="red" className="text-red-600 font-bold">Vermelha (Vela de Baixa)</SelectItem>
                 </SelectContent>
@@ -1183,7 +1189,7 @@ function RuleEditor({
                 <SelectTrigger className="bg-background">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent position="popper" avoidCollisions={true}>
                   <SelectItem value="upper">Pavio Superior (Máxima)</SelectItem>
                   <SelectItem value="lower">Pavio Inferior (Mínima)</SelectItem>
                 </SelectContent>
@@ -1198,7 +1204,7 @@ function RuleEditor({
                 <SelectTrigger className="bg-background">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent position="popper" avoidCollisions={true}>
                   <SelectItem value="body_ratio">Proporção com o corpo</SelectItem>
                   <SelectItem value="larger_than_previous">Maior que pavio anterior</SelectItem>
                 </SelectContent>
@@ -1237,7 +1243,7 @@ function RuleEditor({
                 <SelectTrigger className="bg-background">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent position="popper" avoidCollisions={true}>
                   <SelectItem value="high">Topo (Máxima do período)</SelectItem>
                   <SelectItem value="low">Fundo (Mínima do período)</SelectItem>
                 </SelectContent>
@@ -1269,7 +1275,7 @@ function RuleEditor({
                 <SelectTrigger className="bg-background">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent position="popper" avoidCollisions={true}>
                   <SelectItem value="green" className="text-emerald-600 font-semibold">Todas Verdes</SelectItem>
                   <SelectItem value="red" className="text-red-600 font-semibold">Todas Vermelhas</SelectItem>
                 </SelectContent>
@@ -1318,7 +1324,7 @@ function RuleEditor({
                   <SelectTrigger className="bg-background">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent position="popper" avoidCollisions={true}>
                     <SelectItem value="ema">EMA (Exponencial)</SelectItem>
                     <SelectItem value="sma">SMA (Simples)</SelectItem>
                   </SelectContent>
@@ -1343,7 +1349,7 @@ function RuleEditor({
                   <SelectTrigger className="bg-background">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent position="popper" avoidCollisions={true}>
                     <SelectItem value="above">Preço ACIMA da média</SelectItem>
                     <SelectItem value="below">Preço ABAIXO da média</SelectItem>
                   </SelectContent>
@@ -1361,7 +1367,7 @@ function RuleEditor({
                   <SelectTrigger className="bg-background">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent position="popper" avoidCollisions={true}>
                     <SelectItem value="price">Preço do Candle</SelectItem>
                     <SelectItem value="ma">Outra Média Móvel</SelectItem>
                   </SelectContent>
@@ -1378,7 +1384,7 @@ function RuleEditor({
                     <SelectTrigger className="bg-background">
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent position="popper" avoidCollisions={true}>
                       {(Object.keys(PRICE_TYPE_LABELS) as CandlePriceType[]).map((k) => (
                         <SelectItem key={k} value={k}>{PRICE_TYPE_LABELS[k]}</SelectItem>
                       ))}
@@ -1396,7 +1402,7 @@ function RuleEditor({
                       <SelectTrigger className="bg-background">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent position="popper" avoidCollisions={true}>
                         <SelectItem value="ema">EMA</SelectItem>
                         <SelectItem value="sma">SMA</SelectItem>
                       </SelectContent>
