@@ -171,21 +171,36 @@ function buildCondition(rule: StrategyRule): string | null {
       return `len(_rsi_${period}) > 0 and _rsi_${period}[-1] ${op} ${th}`;
     }
     case "ema_cross": {
+      // Detecta cruzamento real: vela anterior estava no lado oposto, vela atual cruzou
       const fast = Math.max(2, Math.min(50, p.fast || 9));
       const slow = Math.max(fast + 1, Math.min(100, p.slow || 20));
-      const op = rule.signal === "call" ? ">" : "<";
-      return `len(_ema_${fast}) > 0 and len(_ema_${slow}) > 0 and _ema_${fast}[-1] ${op} _ema_${slow}[-1]`;
+      if (rule.signal === "call") {
+        // fast cruzou ACIMA de slow na última vela fechada
+        return `len(_ema_${fast}) >= 3 and len(_ema_${slow}) >= 3 and _ema_${fast}[-2] <= _ema_${slow}[-2] and _ema_${fast}[-1] > _ema_${slow}[-1]`;
+      } else {
+        // fast cruzou ABAIXO de slow na última vela fechada
+        return `len(_ema_${fast}) >= 3 and len(_ema_${slow}) >= 3 and _ema_${fast}[-2] >= _ema_${slow}[-2] and _ema_${fast}[-1] < _ema_${slow}[-1]`;
+      }
     }
     case "sma_cross": {
       const fast = Math.max(2, Math.min(50, p.fast || 9));
       const slow = Math.max(fast + 1, Math.min(100, p.slow || 20));
-      const op = rule.signal === "call" ? ">" : "<";
-      return `len(_sma_${fast}) > 0 and len(_sma_${slow}) > 0 and _sma_${fast}[-1] ${op} _sma_${slow}[-1]`;
+      if (rule.signal === "call") {
+        return `len(_sma_${fast}) >= 3 and len(_sma_${slow}) >= 3 and _sma_${fast}[-2] <= _sma_${slow}[-2] and _sma_${fast}[-1] > _sma_${slow}[-1]`;
+      } else {
+        return `len(_sma_${fast}) >= 3 and len(_sma_${slow}) >= 3 and _sma_${fast}[-2] >= _sma_${slow}[-2] and _sma_${fast}[-1] < _sma_${slow}[-1]`;
+      }
     }
     case "macd": {
+      // Detecta cruzamento do histograma: passou de negativo para positivo (call) ou vice-versa (put)
       const fast = p.fast ?? 12; const slow2 = p.slow ?? 26; const sig = p.signal ?? 9;
-      const op = rule.signal === "call" ? "> 0" : "< 0";
-      return `len(_macd_${fast}_${slow2}_${sig}[2]) > 0 and _macd_${fast}_${slow2}_${sig}[2][-1] ${op}`;
+      const hist = `_macd_${fast}_${slow2}_${sig}[2]`;
+      if (rule.signal === "call") {
+        // Histograma cruzou acima de zero: era negativo, agora positivo
+        return `len(${hist}) >= 3 and ${hist}[-2] <= 0 and ${hist}[-1] > 0`;
+      } else {
+        return `len(${hist}) >= 3 and ${hist}[-2] >= 0 and ${hist}[-1] < 0`;
+      }
     }
     case "candle_body":
       return rule.signal === "call" ? "closes[-1] > opens[-1]" : "closes[-1] < opens[-1]";

@@ -1007,7 +1007,8 @@ def _run_bot(token: str, s, config: dict) -> None:
                 )
                 if out:
                     # Remove ativos bloqueados (não suportados pela corretora)
-                    out = [item for item in out if item.get("name") not in BLOCKED_ACTIVES]
+                    blocked_upper = {b.upper() for b in BLOCKED_ACTIVES}
+                    out = [item for item in out if str(item.get("name", "")).upper() not in blocked_upper]
                     # Garantir filtro rigoroso por Mercado (Aberto vs OTC) e Modalidade
                     if not allow_otc:
                          out = [item for item in out if not _is_active_otc(item.get("name"))]
@@ -1043,10 +1044,12 @@ def _run_bot(token: str, s, config: dict) -> None:
                         "bot_runner: fallback get_available_turbo_actives -> %d ativos",
                         len(raw),
                     )
-                    # Filtra fallback se allow_otc for falso
+                    # Filtra fallback se allow_otc for falso e remove bloqueados
                     filtered_raw = []
+                    blocked_upper = {b.upper() for b in BLOCKED_ACTIVES}
                     for name in raw:
                         if not allow_otc and _is_active_otc(name): continue
+                        if str(name).upper() in blocked_upper: continue
                         filtered_raw.append({"name": name, "type": "binary"})
                     return filtered_raw
         except Exception as e:
@@ -1195,7 +1198,10 @@ def _run_bot(token: str, s, config: dict) -> None:
                         # Buscamos 250 candles para permitir médias longas (ex: 200 period)
                         candles_raw = get_candles(name, 60, 250, endtime)
                         if candles_raw:
-                            candles_m1 = candles_raw
+                            # Remove vela em formação: descarta candle cujo "to" > endtime
+                            candles_m1 = [c for c in candles_raw if int(c.get("to", c.get("from", 0)) or 0) <= endtime]
+                            if not candles_m1:
+                                candles_m1 = candles_raw  # fallback: sem campo "to", usa tudo
                     except Exception:
                         pass
                 candles_m5 = None
@@ -1204,7 +1210,9 @@ def _run_bot(token: str, s, config: dict) -> None:
                         # Buscamos 250 candles para permitir médias longas
                         candles_raw = get_candles(name, 300, 250, endtime)
                         if candles_raw:
-                            candles_m5 = candles_raw
+                            candles_m5 = [c for c in candles_raw if int(c.get("to", c.get("from", 0)) or 0) <= endtime]
+                            if not candles_m5:
+                                candles_m5 = candles_raw
                     except Exception:
                         pass
 
@@ -1233,6 +1241,10 @@ def _run_bot(token: str, s, config: dict) -> None:
                     elif strategy_name.startswith("custom:") and strategy_name in custom_strategies_map:
                         cs = custom_strategies_map[strategy_name]
                         signal_dir = _execute_custom_strategy(cs["code"], list(candles), asset=name)
+                        logging.info(
+                            "bot_runner: estrategia=%s ativo=%s candles=%d resultado=%s",
+                            cs.get("name", strategy_name), name, len(candles), signal_dir or "None",
+                        )
 
                     if signal_dir in ("call", "put"):
                         dur = strategy_duration_map.get(strategy_name, 1)
@@ -1791,8 +1803,11 @@ def _run_bot(token: str, s, config: dict) -> None:
                         else:
                             ok, order_id = False, "digital não disponível"
                     else:
-                        ok, order_val = s.buy(price, candidate, direction, current_duration)
-                        order_id = order_val
+                        try:
+                            ok, order_val = s.buy(price, candidate, direction, current_duration)
+                            order_id = order_val
+                        except KeyError:
+                            ok, order_id = False, "ativo / modalidade indisponível para este formato"
 
                     if ok:
                         used_active = candidate
@@ -1819,8 +1834,11 @@ def _run_bot(token: str, s, config: dict) -> None:
                             else:
                                 ok, order_id = False, "digital não disponível"
                         else:
-                            ok, order_val = s.buy(price, candidate, direction, current_duration)
-                            order_id = order_val
+                            try:
+                                ok, order_val = s.buy(price, candidate, direction, current_duration)
+                                order_id = order_val
+                            except KeyError:
+                                ok, order_id = False, "ativo / modalidade indisponível para este formato"
 
                         if ok:
                             used_active = candidate
