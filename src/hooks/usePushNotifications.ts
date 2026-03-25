@@ -21,29 +21,48 @@ export function usePushNotifications() {
   const [status, setStatus] = useState<PushStatus>("prompt");
   const [error, setError] = useState<string | null>(null);
 
-  // Estado inicial + auto-sync: se já tem permissão e subscription válida,
-  // re-salva no banco para garantir que este dispositivo está registrado.
+  // Auto-sync ao abrir o app:
+  // 1) Se já tem subscription local → re-salva no banco (garante este device registrado)
+  // 2) Se permissão concedida mas sem subscription → recria silenciosamente (sem pedir permissão)
+  //    Cobre: reinstalação do PWA, SW atualizado, subscription expirada, troca de device
   useEffect(() => {
     if (!("Notification" in window) || !("PushManager" in window)) {
       setStatus("unsupported");
       return;
     }
     if (Notification.permission === "denied") { setStatus("denied"); return; }
-    if (Notification.permission === "granted") {
-      _getSW()
-        .then((reg) => reg.pushManager?.getSubscription())
-        .then(async (sub) => {
-          if (sub) {
-            // Subscription local válida → re-salva no banco (garante que este
-            // dispositivo continua registrado mesmo após o usuário abrir em outro device)
-            try { await savePushSubscription(sub, navigator.userAgent); } catch { /* silencioso */ }
-            setStatus("subscribed");
-          } else {
-            setStatus("granted");
-          }
-        })
-        .catch(() => setStatus("granted"));
-    }
+    if (Notification.permission !== "granted") { return; }
+
+    (async () => {
+      try {
+        const reg = await _getSW();
+        let sub = await reg.pushManager?.getSubscription();
+
+        if (sub) {
+          // Subscription existente — re-salva para garantir registro ativo no banco
+          try { await savePushSubscription(sub, navigator.userAgent); } catch { /* silencioso */ }
+          setStatus("subscribed");
+          return;
+        }
+
+        // Permissão concedida mas subscription perdida (SW trocou, reinstalou, expirou)
+        // → recria silenciosamente sem precisar de novo gesto do usuário
+        try {
+          const { publicKey } = await getPushVapidPublic();
+          sub = await reg.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: b64ToArray(publicKey.trim()),
+          });
+          await savePushSubscription(sub, navigator.userAgent);
+          setStatus("subscribed");
+        } catch {
+          // Não conseguiu recriar (iOS em contexto não-PWA, por ex.) → mostra botão manual
+          setStatus("granted");
+        }
+      } catch {
+        setStatus("granted");
+      }
+    })();
   }, []);
 
   const enable = useCallback(async (
