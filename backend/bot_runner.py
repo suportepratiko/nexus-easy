@@ -116,13 +116,16 @@ def _is_active_otc(name: str | None) -> bool:
 
 
 def _is_valid_open_price_guard(direction: str, candle_open: float, market_price: float) -> bool:
-    """Permite entrada se o preço está do lado correto da abertura (com tolerância de ~0.02% para spread)."""
+    """Regra estrita de preço de entrada:
+    COMPRA (call): preço atual <= abertura da vela  (não entrar se já subiu)
+    VENDA  (put):  preço atual >= abertura da vela  (não entrar se já caiu)
+    Sem tolerância — qualquer desvio contra a posição aborta a entrada.
+    """
     if candle_open <= 0:
         return True
-    tol = max(0.0001, abs(candle_open) * 0.0002)
     if direction == "put":
-        return market_price >= candle_open - tol
-    return market_price <= candle_open + tol
+        return market_price >= candle_open
+    return market_price <= candle_open
 
 
 def _trade_lock_for(token: str) -> threading.Lock:
@@ -1756,11 +1759,12 @@ def _run_bot(token: str, s, config: dict) -> None:
                     })
                     break
 
-                # --- VALIDAÇÃO DE PREÇO ANTES DE ENTRAR (GUARDA DE SEGURANÇA) ---
-                # COMPRA (CALL): preço atual deve ser <= abertura da vela
-                # VENDA (PUT): preço atual deve ser >= abertura da vela
-                # Isso garante que não entramos em condições que já mudaram
-                # Aplica para TODAS as estratégias (built-in e customizadas)
+                # --- VALIDAÇÃO DE PREÇO E TIMING ANTES DE ENTRAR ---
+                # Regras estritas (sem tolerância):
+                #   COMPRA (call): preço atual <= abertura da vela
+                #   VENDA  (put):  preço atual >= abertura da vela
+                # Se o preço já se moveu contra a posição, ou se já passamos de
+                # MAX_ENTRY_SECOND_IN_CANDLE segundos na vela, abortamos a entrada.
                 price_guard_ok = True
                 try:
                     # Martingale (mg_level > 0): pula snapshot/get_candles completamente.
@@ -1770,23 +1774,41 @@ def _run_bot(token: str, s, config: dict) -> None:
                         snapshot = None
                     else:
                         snapshot = _get_current_m1_snapshot(active)
+
                     if snapshot:
                         candle_from, candle_open, market_price = snapshot
-                        price_guard_ok = _is_valid_open_price_guard(direction, candle_open, market_price)
+                        _now_guard = int(getattr(s, "get_server_timestamp", lambda: int(time.time()))())
+                        second_in_candle = _now_guard - candle_from
+
+                        # 1. Janela de tempo: só entra nos primeiros MAX_ENTRY_SECOND_IN_CANDLE segundos
+                        if mg_level == 0 and second_in_candle > MAX_ENTRY_SECOND_IN_CANDLE:
+                            logging.warning(
+                                "bot_runner: JANELA DE ENTRADA EXPIRADA — segundo=%ds > limite=%ds | "
+                                "ativo=%s dir=%s — abortando.",
+                                second_in_candle, MAX_ENTRY_SECOND_IN_CANDLE, active, direction,
+                            )
+                            price_guard_ok = False
+
+                        # 2. Preço: estrito, sem tolerância
+                        if price_guard_ok:
+                            price_guard_ok = _is_valid_open_price_guard(direction, candle_open, market_price)
+                            if not price_guard_ok:
+                                logging.warning(
+                                    "bot_runner: PREÇO DESFAVORÁVEL — abortando entrada | "
+                                    "ativo=%s dir=%s abertura=%.5f preço_atual=%.5f segundo=%ds",
+                                    active, direction, candle_open, market_price, second_in_candle,
+                                )
+
                         if not price_guard_ok:
                             if mg_level > 0:
-                                # Martingale: price guard não aborta — entra mesmo assim para honrar o martingale
+                                # Martingale honra a entrada mesmo com preço desfavorável
                                 logging.warning(
-                                    "bot_runner: validação de preço desfavorável em martingale mg_level=%d — entrando mesmo assim | "
-                                    "ativo=%s dir=%s abertura=%.5f preço=%.5f",
-                                    mg_level, active, direction, candle_open, market_price
+                                    "bot_runner: preço/timing desfavorável em martingale mg_level=%d — entrando mesmo assim | "
+                                    "ativo=%s dir=%s abertura=%.5f preço=%.5f segundo=%ds",
+                                    mg_level, active, direction, candle_open, market_price, second_in_candle,
                                 )
+                                price_guard_ok = True  # martingale não aborta
                             else:
-                                logging.warning(
-                                    "bot_runner: VALIDAÇÃO DE PREÇO FALHOU — abortando entrada | "
-                                    "ativo=%s estratégia=%s direção=%s abertura=%.5f preço_atual=%.5f",
-                                    active, current_strategy or "—", direction, candle_open, market_price
-                                )
                                 if not skip_publish:
                                     _publish_shared_signal(
                                         shared_bus_key, minute_bucket, active, active_type, direction, current_strategy,
@@ -1796,13 +1818,13 @@ def _run_bot(token: str, s, config: dict) -> None:
                                 last_processed_bucket = minute_bucket
                                 continue
                         else:
-                            logging.debug(
-                                "bot_runner: validação de preço OK | ativo=%s dir=%s abertura=%.5f preço=%.5f",
-                                active, direction, candle_open, market_price
+                            logging.info(
+                                "bot_runner: preço OK | ativo=%s dir=%s abertura=%.5f preço=%.5f segundo=%ds",
+                                active, direction, candle_open, market_price, second_in_candle,
                             )
+
                 except Exception as price_err:
                     logging.warning("bot_runner: erro ao validar preço (continuando): %s", price_err)
-                    # Em caso de erro na validação, continua (fail-safe)
                 
                 order_id = None
                 ok = False
