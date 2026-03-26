@@ -19,7 +19,8 @@ export type RuleType =
   | "wick_size"
   | "breakout"
   | "consecutive"
-  | "ma_compare";
+  | "ma_compare"
+  | "candle_patterns";
 
 export type CallPut = "call" | "put";
 
@@ -71,6 +72,7 @@ const INDICATOR_MIN_CANDLES: Record<RuleType, number> = {
   candle_body: 5, candle_compare: 15, candle_color: 10, candle_sequence: 10,
   engulfment: 5, bollinger: 30, wick_size: 10,
   breakout: 50, consecutive: 20, ma_compare: 50,
+  candle_patterns: 5,
 };
 
 function minCandlesForRules(rules: StrategyRule[]): number {
@@ -140,6 +142,34 @@ function buildIndicatorSetup(rules: StrategyRule[]): string[] {
           const tPeriod = Math.max(2, Math.min(200, p.targetMaPeriod || 50));
           need(`${p.targetMaType}_${tPeriod}`, `    _ma_${p.targetMaType}_${tPeriod} = ${tFunc}(closes, ${tPeriod})`);
         }
+        break;
+      }
+      case "candle_patterns": {
+        need("candle_patterns_setup", [
+          "    # --- Padrões de Candle (métricas base) ---",
+          "    _cp_body1 = abs(closes[-1] - opens[-1])",
+          "    _cp_rng1  = max(highs[-1] - lows[-1], 0.0001)",
+          "    _cp_lw1   = min(opens[-1], closes[-1]) - lows[-1]",
+          "    _cp_uw1   = highs[-1] - max(opens[-1], closes[-1])",
+          "    _cp_body2 = abs(closes[-2] - opens[-2])",
+          "    _cp_rng2  = max(highs[-2] - lows[-2], 0.0001)",
+          "    # Padrões altistas",
+          "    _cp_hammer      = _cp_body1 > 0 and _cp_lw1 >= _cp_body1 * 2.0 and _cp_uw1 <= _cp_body1 * 0.5 and closes[-1] >= opens[-1]",
+          "    _cp_bull_engulf = closes[-1] > opens[-1] and closes[-2] < opens[-2] and closes[-1] >= opens[-2] and opens[-1] <= closes[-2]",
+          "    _cp_piercing    = closes[-2] < opens[-2] and closes[-1] > opens[-1] and closes[-1] > (opens[-2] + closes[-2]) / 2 and opens[-1] <= closes[-2]",
+          "    _cp_3ws         = closes[-1] > opens[-1] and closes[-2] > opens[-2] and closes[-3] > opens[-3] and closes[-1] > closes[-2] and closes[-2] > closes[-3]",
+          "    _cp_harami_bull = closes[-2] < opens[-2] and closes[-1] > opens[-1] and opens[-1] >= closes[-2] and closes[-1] <= opens[-2]",
+          "    _cp_doji_bull   = _cp_body1 <= _cp_rng1 * 0.1 and _cp_lw1 >= _cp_rng1 * 0.6",
+          "    _cp_bull        = _cp_hammer or _cp_bull_engulf or _cp_piercing or _cp_3ws or _cp_harami_bull or _cp_doji_bull",
+          "    # Padrões baixistas",
+          "    _cp_shoot_star  = _cp_body1 > 0 and _cp_uw1 >= _cp_body1 * 2.0 and _cp_lw1 <= _cp_body1 * 0.5 and closes[-1] <= opens[-1]",
+          "    _cp_bear_engulf = closes[-1] < opens[-1] and closes[-2] > opens[-2] and closes[-1] <= opens[-2] and opens[-1] >= closes[-2]",
+          "    _cp_dark_cloud  = closes[-2] > opens[-2] and closes[-1] < opens[-1] and closes[-1] < (opens[-2] + closes[-2]) / 2 and opens[-1] >= closes[-2]",
+          "    _cp_3bc         = closes[-1] < opens[-1] and closes[-2] < opens[-2] and closes[-3] < opens[-3] and closes[-1] < closes[-2] and closes[-2] < closes[-3]",
+          "    _cp_harami_bear = closes[-2] > opens[-2] and closes[-1] < opens[-1] and opens[-1] <= closes[-2] and closes[-1] >= opens[-2]",
+          "    _cp_doji_bear   = _cp_body1 <= _cp_rng1 * 0.1 and _cp_uw1 >= _cp_rng1 * 0.6",
+          "    _cp_bear        = _cp_shoot_star or _cp_bear_engulf or _cp_dark_cloud or _cp_3bc or _cp_harami_bear or _cp_doji_bear",
+        ].join("\n"));
         break;
       }
     }
@@ -287,6 +317,8 @@ function buildCondition(rule: StrategyRule): string | null {
         return `len(_ma_${p.maType}_${period}) > 0 and len(_ma_${p.targetMaType ?? "ema"}_${tPeriod}) > 0 and _ma_${p.maType}_${period}[-1] ${comp} _ma_${p.targetMaType ?? "ema"}_${tPeriod}[-1]`;
       }
     }
+    case "candle_patterns":
+      return rule.signal === "call" ? "_cp_bull" : "_cp_bear";
     default:
       return null;
   }
@@ -374,6 +406,7 @@ function ruleShortLabel(rule: StrategyRule): string {
     case "breakout": return "Rompimento de Máxima/Mínima";
     case "consecutive": return `${p.count ?? 3} velas seguidas`;
     case "ma_compare": return `Média ${(p.maType as string).toUpperCase()}(${p.period ?? 20})`;
+    case "candle_patterns": return rule.signal === "call" ? "Padrões de Alta (todos)" : "Padrões de Baixa (todos)";
     default: return rule.type;
   }
 }
@@ -402,6 +435,7 @@ export const RULE_TYPE_LABELS: Record<RuleType, string> = {
   sma_cross:      "Cruzamento de Médias (SMA)",
   macd:           "MACD — força e direção do movimento",
   ma_compare:     "Média Móvel vs Preço (seguir tendência)",
+  candle_patterns: "Padrões de Candle (todos os padrões clássicos)",
 };
 
 export const RULE_TYPE_HINT: Record<RuleType, string> = {
@@ -419,4 +453,5 @@ export const RULE_TYPE_HINT: Record<RuleType, string> = {
   sma_cross:      "Igual ao cruzamento de EMA, mas usa médias simples. Reação mais lenta, mas mais estável.",
   macd:           "Indicador que mostra se a força do movimento está aumentando ou diminuindo. Bom para confirmar entradas.",
   ma_compare:     "Compara uma média móvel com o preço atual ou com outra média. Útil para seguir tendências maiores.",
+  candle_patterns: "Detecta automaticamente todos os padrões clássicos: Hammer, Engolfo, Piercing, 3 Soldados Brancos, Harami, Shooting Star, Dark Cloud Cover, 3 Corvos Negros e Doji de reversão. Entra se qualquer um aparecer.",
 };

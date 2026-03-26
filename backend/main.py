@@ -1319,6 +1319,9 @@ class StrategyOut(BaseModel):
     description: str | None
     config: Any | None = None
     created_at: str | None
+    wins: int = 0
+    losses: int = 0
+    win_rate: float | None = None
 
 
 @app.post("/api/platform/strategies/gemini-draft", response_model=GeminiDraftResponse)
@@ -1402,10 +1405,41 @@ def list_custom_strategies(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Lista estratégias customizadas do usuário."""
+    """Lista estratégias customizadas do usuário com stats de win/loss."""
+    from sqlalchemy import func as sqlfunc
     rows = db.query(CustomStrategy).filter(CustomStrategy.user_id == current_user.id).order_by(CustomStrategy.created_at.desc()).all()
-    return [
-        StrategyOut(
+
+    # Busca stats de win/loss por strategy_key (ex: "custom:Media MACD") para o e-mail do usuário
+    stats_rows = (
+        db.query(
+            UserOperation.strategy,
+            UserOperation.result,
+            sqlfunc.count(UserOperation.id).label("cnt"),
+        )
+        .filter(
+            UserOperation.user_email == str(current_user.email).strip().lower(),
+            UserOperation.strategy.isnot(None),
+            UserOperation.result.in_(["win", "loss"]),
+        )
+        .group_by(UserOperation.strategy, UserOperation.result)
+        .all()
+    )
+    # Agrupa: { "custom:Media MACD": {"win": 10, "loss": 5} }
+    stats_map: dict[str, dict[str, int]] = {}
+    for strategy_key, result, cnt in stats_rows:
+        if strategy_key not in stats_map:
+            stats_map[strategy_key] = {"win": 0, "loss": 0}
+        stats_map[strategy_key][result] = int(cnt)
+
+    out = []
+    for s in rows:
+        key = f"custom:{s.name}"
+        st = stats_map.get(key, {})
+        wins = st.get("win", 0)
+        losses = st.get("loss", 0)
+        total = wins + losses
+        win_rate = round(wins / total * 100, 1) if total > 0 else None
+        out.append(StrategyOut(
             id=str(s.id),
             name=s.name,
             code=s.code,
@@ -1413,9 +1447,11 @@ def list_custom_strategies(
             description=s.description,
             config=s.config,
             created_at=s.created_at.isoformat() if s.created_at else None,
-        )
-        for s in rows
-    ]
+            wins=wins,
+            losses=losses,
+            win_rate=win_rate,
+        ))
+    return out
 
 
 @app.patch("/api/platform/strategies/{strategy_id}", response_model=StrategyOut)

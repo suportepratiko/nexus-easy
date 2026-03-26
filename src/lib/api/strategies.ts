@@ -20,6 +20,9 @@ export type CustomStrategy = {
   description: string | null;
   config?: any;
   created_at: string | null;
+  wins: number;
+  losses: number;
+  win_rate: number | null;
 };
 
 export async function getGeminiStrategyDraft(

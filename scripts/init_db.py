@@ -74,6 +74,7 @@ def main():
         for col, sql in [
             ("is_active", "ALTER TABLE users ADD COLUMN is_active BOOLEAN NOT NULL DEFAULT true"),
             ("expires_at", "ALTER TABLE users ADD COLUMN expires_at TIMESTAMP WITH TIME ZONE"),
+            ("strategy", "ALTER TABLE user_operations ADD COLUMN strategy VARCHAR(200)"),
         ]:
             try:
                 conn.execute(text(sql))

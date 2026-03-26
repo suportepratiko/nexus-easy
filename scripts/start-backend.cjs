@@ -74,25 +74,60 @@ for (let i = 1; i <= seedAttempts; i++) {
 
 console.error("[backend] API em http://localhost:8001 (frontend em 8000) ...");
 
-const child = spawn(
-  venvPython,
-  ["-m", "uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8001", "--reload", "--reload-dir", "backend", "--reload-dir", "safirionapi", "--log-level", "error"],
-  {
-    stdio: "inherit",
-    cwd: root,
-    env,
-  }
-);
+let restartCount = 0;
+const MAX_RESTARTS = 999;
+const BASE_RESTART_DELAY_MS = 3000;
 
-child.on("error", (err) => {
-  console.error("[backend] Erro:", err.message);
-  console.error("[backend] Confira: npm run setup:backend");
-  process.exit(1);
-});
+function startUvicorn() {
+  const child = spawn(
+    venvPython,
+    ["-m", "uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8001", "--log-level", "error"],
+    {
+      stdio: "inherit",
+      cwd: root,
+      env,
+    }
+  );
 
-child.on("exit", (code) => {
-  if (code !== 0 && code !== null) {
-    console.error("[backend] Processo encerrado com código", code);
+  child.on("error", (err) => {
+    console.error("[backend] Erro ao iniciar processo:", err.message);
+    scheduleRestart();
+  });
+
+  child.on("exit", (code, signal) => {
+    if (signal === "SIGTERM" || signal === "SIGINT") {
+      // Encerramento intencional — não reinicia
+      console.error(`[backend] Processo encerrado por sinal ${signal}. Saindo.`);
+      process.exit(0);
+    }
+    if (code !== 0 && code !== null) {
+      console.error(`[backend] Processo encerrado com código ${code}. Reiniciando...`);
+    } else {
+      console.error("[backend] Processo encerrado inesperadamente. Reiniciando...");
+    }
+    scheduleRestart();
+  });
+
+  return child;
+}
+
+function scheduleRestart() {
+  if (restartCount >= MAX_RESTARTS) {
+    console.error("[backend] Máximo de reinicializações atingido. Encerrando.");
+    process.exit(1);
   }
-  process.exit(code ?? 0);
-});
+  restartCount++;
+  const delay = Math.min(BASE_RESTART_DELAY_MS * restartCount, 30000);
+  console.error(`[backend] Reiniciando em ${delay / 1000}s (tentativa ${restartCount})...`);
+  setTimeout(() => {
+    console.error("[backend] Reiniciando backend...");
+    startUvicorn();
+  }, delay);
+}
+
+// Encaminha SIGTERM/SIGINT para o processo filho e encerra sem reiniciar
+let currentChild = null;
+process.on("SIGTERM", () => { if (currentChild) currentChild.kill("SIGTERM"); });
+process.on("SIGINT",  () => { if (currentChild) currentChild.kill("SIGINT"); });
+
+currentChild = startUvicorn();

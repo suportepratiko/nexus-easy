@@ -328,7 +328,7 @@ def _get_shared_signal(bus_key: str, minute_bucket: int) -> tuple[str, str, str,
     )
 
 
-def _save_user_operation(email: str | None, op: dict[str, Any], total_profit: float | None, account_mode: str = "REAL") -> None:
+def _save_user_operation(email: str | None, op: dict[str, Any], total_profit: float | None, account_mode: str = "REAL", strategy: str | None = None) -> None:
     """
     Persiste uma operação do robô para uso em relatórios/ranking.
     Operações de conta PRACTICE (demo) não são salvas no ranking.
@@ -378,6 +378,7 @@ def _save_user_operation(email: str | None, op: dict[str, Any], total_profit: fl
             profit=profit_f,
             balance_after=balance_f,
             total_profit_after=float(total_profit or 0.0),
+            strategy=str(strategy)[:200] if strategy else None,
         )
         db.add(rec)
         db.commit()
@@ -941,8 +942,11 @@ def _run_bot(token: str, s, config: dict) -> None:
         wait_next_candle=wait_next_candle,
     )
     last_heartbeat_log_ts = 0
-    # Evita re-entrar no mesmo minuto se já houve uma tentativa (sucesso ou falha)
-    last_processed_bucket = -1
+    # Evita re-entrar no mesmo minuto se já houve uma tentativa (sucesso ou falha).
+    # Inicia no minuto atual para que a PRIMEIRA varredura aconteça apenas no próximo
+    # minuto completo — garante que regras e "entrada na próxima vela" sejam respeitados
+    # desde a primeira operação (sem entrar no meio de uma vela em andamento).
+    last_processed_bucket = int(time.time()) // 60
     # Contador de erros consecutivos no loop principal (aumenta o sleep, nunca encerra)
     _consecutive_errors = 0
     
@@ -1587,6 +1591,25 @@ def _run_bot(token: str, s, config: dict) -> None:
                     bucket_size = 300 if current_duration >= 5 else 60
                     target_min_start = current_candle_from + bucket_size
                     delay = max(0, target_min_start - now_ts_for_bucket)
+
+                    # Proteção: se o sinal está atrasado (já passamos da janela de entrada
+                    # na próxima vela — MAX_ENTRY_SECOND_IN_CANDLE segundos), o sinal é
+                    # obsoleto. Abortar para não entrar no meio de uma vela.
+                    if mg_level == 0 and now_ts_for_bucket > target_min_start + MAX_ENTRY_SECOND_IN_CANDLE:
+                        logging.info(
+                            "bot_runner (Lider): sinal obsoleto — já passaram %ds da abertura da vela alvo "
+                            "(limite=%ds). Descartando.",
+                            now_ts_for_bucket - target_min_start, MAX_ENTRY_SECOND_IN_CANDLE,
+                        )
+                        current_active = None
+                        if not skip_publish:
+                            _publish_shared_signal(
+                                shared_bus_key, minute_bucket, active, active_type, direction, current_strategy,
+                                status="aborted", signals_data=found_any
+                            )
+                        last_processed_bucket = minute_bucket
+                        continue
+
                     if delay > 0:
                         logging.info("bot_runner (Lider): aguardando próxima vela (%dm) em %.0fs", current_duration, delay)
                     while state.get("running") and state.get("_gen") == my_gen:
@@ -2135,7 +2158,7 @@ def _run_bot(token: str, s, config: dict) -> None:
                     })
                     # Persiste operação para ranking de usuários (se houver email de sessão).
                     try:
-                        _save_user_operation(session_email, operations[-1], total_profit, account_mode)
+                        _save_user_operation(session_email, operations[-1], total_profit, account_mode, strategy=current_strategy)
                     except Exception:
                         # Erros já são logados dentro de _save_user_operation
                         pass

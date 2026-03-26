@@ -29,6 +29,8 @@ import {
   Copy,
   AlertTriangle,
   CheckCircle2,
+  BarChart2,
+  RefreshCw,
 } from "lucide-react";
 import {
   generateStrategyCode,
@@ -51,6 +53,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -134,6 +137,10 @@ function ruleToHuman(rule: StrategyRule): string {
         return `Preço de ${PRICE_TYPE_LABELS[(p.targetPriceType ?? "close") as CandlePriceType]} está ${comp} da ${p.maType?.toUpperCase() ?? "EMA"}(${p.period ?? 20})`;
       return `${p.maType?.toUpperCase() ?? "EMA"}(${p.period ?? 20}) está ${comp} da ${p.targetMaType?.toUpperCase() ?? "EMA"}(${p.targetMaPeriod ?? 50})`;
     }
+    case "candle_patterns":
+      return rule.signal === "call"
+        ? "Padrões de Alta: Hammer, Engolfo, Piercing, 3 Soldados, Harami, Doji de reversão"
+        : "Padrões de Baixa: Shooting Star, Engolfo, Dark Cloud, 3 Corvos, Harami, Doji de reversão";
     default:
       return rule.type;
   }
@@ -677,101 +684,221 @@ export default function CreateStrategyPage() {
         </Button>
       </div>
 
-      <Card className="border-border bg-card">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
-            <List className="h-4 w-4" />
-            Estratégias criadas
-          </CardTitle>
-          <CardDescription>
-            Suas estratégias aparecem em Configurar Robô para uso no robô.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {loadingList ? (
-            <div className="space-y-2 animate-pulse">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="flex items-center gap-4 rounded-lg border border-border px-4 py-3">
-                  <div className="flex-1 space-y-1.5">
-                    <Skeleton className="h-4 w-36" />
-                    <Skeleton className="h-3 w-52" />
-                  </div>
-                  <Skeleton className="h-5 w-8 rounded-full" />
-                  <div className="flex gap-1.5">
-                    {Array.from({ length: 4 }).map((_, j) => <Skeleton key={j} className="h-8 w-8 rounded-md" />)}
-                  </div>
+      <Tabs defaultValue="lista">
+        <div className="flex items-center justify-between gap-4 mb-3">
+          <TabsList className="h-9">
+            <TabsTrigger value="lista" className="gap-1.5 text-xs px-4">
+              <List className="h-3.5 w-3.5" />
+              Estratégias
+            </TabsTrigger>
+            <TabsTrigger value="stats" className="gap-1.5 text-xs px-4">
+              <BarChart2 className="h-3.5 w-3.5" />
+              Estatísticas
+            </TabsTrigger>
+          </TabsList>
+          <button
+            onClick={loadStrategies}
+            disabled={loadingList}
+            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-40"
+            title="Atualizar"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${loadingList ? "animate-spin" : ""}`} />
+            Atualizar
+          </button>
+        </div>
+
+        {/* ABA: LISTA */}
+        <TabsContent value="lista" className="mt-0">
+          <Card className="border-border bg-card">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <List className="h-4 w-4" />
+                Estratégias criadas
+              </CardTitle>
+              <CardDescription>
+                Suas estratégias aparecem em Configurar Robô para uso no robô.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {loadingList ? (
+                <div className="space-y-2 animate-pulse">
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <div key={i} className="flex items-center gap-4 rounded-lg border border-border px-4 py-3">
+                      <div className="flex-1 space-y-1.5">
+                        <Skeleton className="h-4 w-36" />
+                        <Skeleton className="h-3 w-52" />
+                      </div>
+                      <Skeleton className="h-5 w-8 rounded-full" />
+                      <div className="flex gap-1.5">
+                        {Array.from({ length: 4 }).map((_, j) => <Skeleton key={j} className="h-8 w-8 rounded-md" />)}
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          ) : strategies.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-border/60 py-10 text-center">
-              <p className="text-sm text-muted-foreground mb-4">
-                Nenhuma estratégia personalizada ainda.
-              </p>
-              <Button onClick={handleStartCreate} className="gap-2">
-                <Plus className="h-4 w-4" />
-                Criar primeira estratégia
-              </Button>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {strategies.map((s) => (
-                <div
-                  key={s.id}
-                  className="flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-background/40 px-3 py-2.5 hover:border-primary/30 transition-colors"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-foreground truncate">
-                      {s.name}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <Badge variant="outline" className="text-[10px]">
-                      {s.timeframe}
-                    </Badge>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                      onClick={() => handleStartEdit(s)}
-                      title="Editar lógica"
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                      onClick={() => setDetailStrategy(s)}
-                      title="Ver detalhes"
-                    >
-                      <Eye className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-muted-foreground hover:text-primary"
-                      onClick={() => navigate("/bot-config")}
-                      title="Usar no robô"
-                    >
-                      <Settings className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                      onClick={() => setDeleteId(s.id)}
-                      title="Excluir"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
+              ) : strategies.length === 0 ? (
+                <div className="rounded-lg border border-dashed border-border/60 py-10 text-center">
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Nenhuma estratégia personalizada ainda.
+                  </p>
+                  <Button onClick={handleStartCreate} className="gap-2">
+                    <Plus className="h-4 w-4" />
+                    Criar primeira estratégia
+                  </Button>
                 </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+              ) : (
+                <div className="space-y-2">
+                  {strategies.map((s) => (
+                    <div
+                      key={s.id}
+                      className="flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-background/40 px-3 py-2.5 hover:border-primary/30 transition-colors"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-foreground truncate">{s.name}</p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <Badge variant="outline" className="text-[10px]">
+                          {s.timeframe}
+                        </Badge>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                          onClick={() => handleStartEdit(s)}
+                          title="Editar lógica"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                          onClick={() => setDetailStrategy(s)}
+                          title="Ver detalhes"
+                        >
+                          <Eye className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground hover:text-primary"
+                          onClick={() => navigate("/bot-config")}
+                          title="Usar no robô"
+                        >
+                          <Settings className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                          onClick={() => setDeleteId(s.id)}
+                          title="Excluir"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ABA: ESTATÍSTICAS */}
+        <TabsContent value="stats" className="mt-0">
+          <Card className="border-border bg-card">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <BarChart2 className="h-4 w-4" />
+                Estatísticas por estratégia
+              </CardTitle>
+              <CardDescription>
+                Win rate, wins e losses de cada estratégia com base nas operações reais do robô.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loadingList ? (
+                <div className="space-y-3 animate-pulse">
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <div key={i} className="rounded-lg border border-border px-4 py-3 space-y-2">
+                      <Skeleton className="h-4 w-40" />
+                      <Skeleton className="h-2 w-full rounded-full" />
+                      <div className="flex gap-4">
+                        <Skeleton className="h-3 w-16" />
+                        <Skeleton className="h-3 w-16" />
+                        <Skeleton className="h-3 w-16" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : strategies.length === 0 ? (
+                <div className="rounded-lg border border-dashed border-border/60 py-10 text-center">
+                  <p className="text-sm text-muted-foreground">Nenhuma estratégia criada ainda.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {[...strategies]
+                    .sort((a, b) => {
+                      const totalA = a.wins + a.losses;
+                      const totalB = b.wins + b.losses;
+                      if (totalA === 0 && totalB === 0) return 0;
+                      if (totalA === 0) return 1;
+                      if (totalB === 0) return -1;
+                      return (b.win_rate ?? 0) - (a.win_rate ?? 0);
+                    })
+                    .map((s) => {
+                      const total = s.wins + s.losses;
+                      const pct = s.win_rate ?? 0;
+                      const color = pct >= 60 ? "bg-green-500" : pct >= 50 ? "bg-yellow-500" : "bg-red-500";
+                      const textColor = pct >= 60 ? "text-green-500" : pct >= 50 ? "text-yellow-500" : "text-red-500";
+                      return (
+                        <div
+                          key={s.id}
+                          className="rounded-lg border border-border/60 bg-background/40 px-4 py-3 space-y-2"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <p className="text-sm font-medium text-foreground truncate">{s.name}</p>
+                              <Badge variant="outline" className="text-[10px] shrink-0">{s.timeframe}</Badge>
+                            </div>
+                            {total > 0 ? (
+                              <span className={`text-lg font-bold tabular-nums shrink-0 ${textColor}`}>
+                                {pct}%
+                              </span>
+                            ) : (
+                              <span className="text-xs text-muted-foreground shrink-0">Sem dados</span>
+                            )}
+                          </div>
+
+                          {total > 0 ? (
+                            <>
+                              {/* Barra de progresso */}
+                              <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                                <div
+                                  className={`h-full rounded-full transition-all ${color}`}
+                                  style={{ width: `${pct}%` }}
+                                />
+                              </div>
+                              <div className="flex items-center gap-4 text-xs">
+                                <span className="text-green-500 font-medium">{s.wins} wins</span>
+                                <span className="text-red-500 font-medium">{s.losses} losses</span>
+                                <span className="text-muted-foreground">{total} total</span>
+                              </div>
+                            </>
+                          ) : (
+                            <p className="text-xs text-muted-foreground">
+                              Nenhuma operação registrada com esta estratégia ainda.
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
       {/* Detail Dialog */}
       <Dialog open={!!detailStrategy} onOpenChange={(open) => !open && setDetailStrategy(null)}>
@@ -883,7 +1010,15 @@ function RuleEditor({
             >
               <SelectGroup>
                 <SelectLabel className="text-xs font-bold text-muted-foreground uppercase tracking-wider px-2 py-1.5">
-                  Velas
+                  ✦ Combinado
+                </SelectLabel>
+                <SelectItem value="candle_patterns" className="py-2.5 font-medium text-primary">
+                  {RULE_TYPE_LABELS["candle_patterns"]}
+                </SelectItem>
+              </SelectGroup>
+              <SelectGroup>
+                <SelectLabel className="text-xs font-bold text-muted-foreground uppercase tracking-wider px-2 py-1.5 mt-1">
+                  Velas (individuais)
                 </SelectLabel>
                 {(["candle_body", "consecutive", "candle_sequence", "wick_size", "breakout", "candle_compare", "engulfment", "candle_color"] as RuleType[]).map((t) => (
                   <SelectItem key={t} value={t} className="py-2.5">

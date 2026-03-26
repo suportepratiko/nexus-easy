@@ -265,6 +265,8 @@ class UserOperation(Base):
     balance_after = Column(Float, nullable=True)
     # Lucro total acumulado no robô após esta operação (ajuda em gráficos futuros).
     total_profit_after = Column(Float, nullable=True)
+    # Nome da estratégia usada (ex: "otc", "supertrend", "custom:Media MACD")
+    strategy = Column(String(200), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 

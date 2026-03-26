@@ -63,18 +63,31 @@ function StatCard({
   );
 }
 
+const EMPTY_METRICS: Metrics = {
+  online_users: 0,
+  online_emails: [],
+  broker_sessions: 0,
+  running_bots: 0,
+  running_bots_detail: [],
+  total_users: 0,
+  active_users: 0,
+  ops_today: 0,
+  wins_today: 0,
+  losses_today: 0,
+  profit_today: 0,
+  win_rate_today: 0,
+};
+
 export default function AdminMetricsPage() {
   const { user } = usePlatformAuth();
-  const [metrics, setMetrics] = useState<Metrics | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [metrics, setMetrics] = useState<Metrics>(EMPTY_METRICS);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
   if (!user || user.role !== "admin") return <Navigate to="/" replace />;
 
-  const fetchMetrics = useCallback(async (silent = false) => {
-    if (!silent) setLoading(true);
-    else setRefreshing(true);
+  const fetchMetrics = useCallback(async () => {
+    setRefreshing(true);
     try {
       const token = getPlatformToken();
       const r = await fetch("/api/platform/admin/metrics", {
@@ -85,7 +98,6 @@ export default function AdminMetricsPage() {
         setLastUpdate(new Date());
       }
     } finally {
-      setLoading(false);
       setRefreshing(false);
     }
   }, []);
@@ -93,14 +105,6 @@ export default function AdminMetricsPage() {
   useEffect(() => {
     fetchMetrics();
   }, [fetchMetrics]);
-
-  if (!metrics) {
-    return (
-      <div className="flex items-center justify-center min-h-[40vh] gap-2 text-muted-foreground">
-        <RefreshCw className="h-5 w-5 animate-spin" /><span>Carregando métricas…</span>
-      </div>
-    );
-  }
 
   const profitColor = metrics.profit_today >= 0 ? "text-green-500" : "text-red-500";
   const profitSign = metrics.profit_today >= 0 ? "+" : "";
