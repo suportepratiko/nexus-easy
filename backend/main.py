@@ -1409,27 +1409,30 @@ def list_custom_strategies(
     from sqlalchemy import func as sqlfunc
     rows = db.query(CustomStrategy).filter(CustomStrategy.user_id == current_user.id).order_by(CustomStrategy.created_at.desc()).all()
 
-    # Busca stats de win/loss por strategy_key (ex: "custom:Media MACD") para o e-mail do usuário
-    stats_rows = (
-        db.query(
-            UserOperation.strategy,
-            UserOperation.result,
-            sqlfunc.count(UserOperation.id).label("cnt"),
-        )
-        .filter(
-            UserOperation.user_email == str(current_user.email).strip().lower(),
-            UserOperation.strategy.isnot(None),
-            UserOperation.result.in_(["win", "loss"]),
-        )
-        .group_by(UserOperation.strategy, UserOperation.result)
-        .all()
-    )
-    # Agrupa: { "custom:Media MACD": {"win": 10, "loss": 5} }
+    # Busca stats de win/loss por strategy_key. Usa SQL raw para não quebrar se a
+    # coluna 'strategy' ainda não existir no banco (migração pendente).
     stats_map: dict[str, dict[str, int]] = {}
-    for strategy_key, result, cnt in stats_rows:
-        if strategy_key not in stats_map:
-            stats_map[strategy_key] = {"win": 0, "loss": 0}
-        stats_map[strategy_key][result] = int(cnt)
+    try:
+        from sqlalchemy import text as sa_text
+        stats_rows = db.execute(
+            sa_text(
+                "SELECT strategy, result, COUNT(*) AS cnt "
+                "FROM user_operations "
+                "WHERE user_email = :email AND strategy IS NOT NULL AND result IN ('win','loss') "
+                "GROUP BY strategy, result"
+            ),
+            {"email": str(current_user.email).strip().lower()},
+        ).fetchall()
+        for row in stats_rows:
+            key = row[0]
+            result = row[1]
+            cnt = int(row[2])
+            if key not in stats_map:
+                stats_map[key] = {"win": 0, "loss": 0}
+            stats_map[key][result] = cnt
+    except Exception:
+        # Coluna ainda não existe no banco — ignora stats, retorna zeros
+        pass
 
     out = []
     for s in rows:
