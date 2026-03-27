@@ -84,8 +84,6 @@ export default function AdminMetricsPage() {
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  if (!user || user.role !== "admin") return <Navigate to="/" replace />;
-
   const fetchMetrics = useCallback(async () => {
     setRefreshing(true);
     try {
@@ -103,8 +101,10 @@ export default function AdminMetricsPage() {
   }, []);
 
   useEffect(() => {
-    fetchMetrics();
-  }, [fetchMetrics]);
+    if (user?.role === "admin") fetchMetrics();
+  }, [fetchMetrics, user]);
+
+  if (!user || user.role !== "admin") return <Navigate to="/" replace />;
 
   const profitColor = metrics.profit_today >= 0 ? "text-green-500" : "text-red-500";
   const profitSign = metrics.profit_today >= 0 ? "+" : "";
