@@ -382,6 +382,7 @@ def init_db() -> None:
             )
         """))
         conn.execute(text("ALTER TABLE extra_links ADD COLUMN IF NOT EXISTS icon VARCHAR(64) NOT NULL DEFAULT 'Link'"))
+        conn.execute(text("ALTER TABLE user_operations ADD COLUMN IF NOT EXISTS strategy VARCHAR(200)"))
 
         # ── Indexes para performance com muitos usuários ──
         conn.execute(text("CREATE INDEX IF NOT EXISTS idx_user_ops_timestamp ON user_operations (\"timestamp\" DESC)"))
